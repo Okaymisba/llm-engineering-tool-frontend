@@ -70,10 +70,10 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
 
     try {
       await verifyOTP(email, otp);
-      setSuccess('Email verified successfully!');
+      setSuccess('Email verified successfully! Redirecting to login...');
       setTimeout(() => {
         onVerificationSuccess();
-      }, 1500);
+      }, 2000);
     } catch (err: any) {
       setError(err.message || 'OTP verification failed');
     }
@@ -118,40 +118,56 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
               maxLength={6}
               className="text-center text-lg tracking-widest"
               required
+              disabled={success.includes('successfully')}
             />
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading || otp.length !== 6}>
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isLoading || otp.length !== 6 || success.includes('successfully')}
+          >
             {isLoading ? 'Verifying...' : 'Verify Email'}
           </Button>
 
-          <div className="text-center space-y-2">
-            {!canResend && countdown > 0 && (
-              <p className="text-sm text-gray-600">
-                Resend OTP in {formatTime(countdown)}
-              </p>
-            )}
+          {!success.includes('successfully') && (
+            <div className="text-center space-y-2">
+              {!canResend && countdown > 0 && (
+                <p className="text-sm text-gray-600">
+                  Resend OTP in {formatTime(countdown)}
+                </p>
+              )}
 
-            {canResend && (
-              <Button
+              {canResend && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleSendOTP}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  Resend OTP
+                </Button>
+              )}
+
+              <button
                 type="button"
-                variant="outline"
-                onClick={handleSendOTP}
+                onClick={onBack}
+                className="text-sm text-blue-600 hover:underline"
                 disabled={isLoading}
-                className="w-full"
               >
-                Resend OTP
-              </Button>
-            )}
+                Back to signup
+              </button>
+            </div>
+          )}
 
-            <button
-              type="button"
-              onClick={onBack}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              Back to signup
-            </button>
-          </div>
+          {success.includes('successfully') && (
+            <div className="text-center">
+              <p className="text-sm text-gray-600">
+                You can now login with your credentials on the login page.
+              </p>
+            </div>
+          )}
         </form>
       </CardContent>
     </Card>

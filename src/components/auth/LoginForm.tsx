@@ -9,9 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 interface LoginFormProps {
   onSwitchToSignup: () => void;
+  onNeedVerification: (email: string) => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onNeedVerification }) => {
   const { login, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,7 +25,14 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup }) => {
     try {
       await login(email, password);
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      const errorMessage = err.message || 'Login failed';
+      
+      if (errorMessage.includes('Please verify your email first')) {
+        // Redirect to verification page with the email
+        onNeedVerification(email);
+      } else {
+        setError(errorMessage);
+      }
     }
   };
 

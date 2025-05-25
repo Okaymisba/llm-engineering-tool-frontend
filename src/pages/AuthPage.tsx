@@ -18,6 +18,13 @@ export const AuthPage: React.FC = () => {
     setCurrentStep('verify-otp');
   };
 
+  const handleNeedVerification = (email: string) => {
+    // Extract username from email or use a placeholder
+    const username = email.split('@')[0];
+    setSignupData({ email, username });
+    setCurrentStep('verify-otp');
+  };
+
   const handleVerificationSuccess = () => {
     setCurrentStep('login');
     setSignupData(null);
@@ -28,10 +35,18 @@ export const AuthPage: React.FC = () => {
     setSignupData(null);
   };
 
+  const handleBackToLogin = () => {
+    setCurrentStep('login');
+    setSignupData(null);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
       {currentStep === 'login' && (
-        <LoginForm onSwitchToSignup={handleSwitchToSignup} />
+        <LoginForm 
+          onSwitchToSignup={handleSwitchToSignup}
+          onNeedVerification={handleNeedVerification}
+        />
       )}
       
       {currentStep === 'signup' && (
@@ -46,7 +61,7 @@ export const AuthPage: React.FC = () => {
           email={signupData.email}
           username={signupData.username}
           onVerificationSuccess={handleVerificationSuccess}
-          onBack={handleBackToSignup}
+          onBack={currentStep === 'verify-otp' && signupData.username === signupData.email.split('@')[0] ? handleBackToLogin : handleBackToSignup}
         />
       )}
     </div>

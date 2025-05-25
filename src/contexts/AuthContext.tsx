@@ -78,7 +78,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.detail || 'Login failed');
+        const errorWithStatus = new Error(error.detail || 'Login failed');
+        (errorWithStatus as any).status = response.status;
+        console.log('Login error response:', { status: response.status, error: error.detail });
+        throw errorWithStatus;
       }
 
       const data = await response.json();

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -25,13 +24,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onNeedVe
     try {
       await login(email, password);
     } catch (err: any) {
-      const errorMessage = err.message || 'Login failed';
+      console.log('Login error:', err);
       
-      if (errorMessage.includes('Please verify your email first')) {
+      // Check if it's a 403 error (email not verified) or if the message contains verification text
+      if (err.message?.includes('Please verify your email first') || 
+          err.status === 403 || 
+          err.message?.includes('verify your email')) {
         // Redirect to verification page with the email
         onNeedVerification(email);
       } else {
-        setError(errorMessage);
+        setError(err.message || 'Login failed');
       }
     }
   };

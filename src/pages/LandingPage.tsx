@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sparkles } from 'lucide-react';
@@ -124,62 +125,6 @@ export const LandingPage: React.FC = () => {
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Start Creating</h3>
               <p className="text-gray-600">Integrate the AI model into your project and start creating.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section className="bg-gray-50 py-16">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-gray-900 text-center mb-8">
-            Transparent Pricing
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Pricing Tier 1 */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Free</h3>
-              <p className="text-gray-600 mb-4">Ideal for testing and small projects.</p>
-              <div className="text-center mb-4">
-                <span className="text-4xl font-bold text-gray-900">$0</span>
-                <span className="text-gray-600">/month</span>
-              </div>
-              <ul className="space-y-2 text-gray-600">
-                <li>Access to basic AI models</li>
-                <li>Limited API requests</li>
-                <li>Community support</li>
-              </ul>
-              <Button className="w-full mt-4">Get Started</Button>
-            </div>
-            {/* Pricing Tier 2 */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Standard</h3>
-              <p className="text-gray-600 mb-4">For growing projects with increased needs.</p>
-              <div className="text-center mb-4">
-                <span className="text-4xl font-bold text-gray-900">$49</span>
-                <span className="text-gray-600">/month</span>
-              </div>
-              <ul className="space-y-2 text-gray-600">
-                <li>Access to standard AI models</li>
-                <li>Increased API requests</li>
-                <li>Priority support</li>
-              </ul>
-              <Button className="w-full mt-4">Get Started</Button>
-            </div>
-            {/* Pricing Tier 3 */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Premium</h3>
-              <p className="text-gray-600 mb-4">For large-scale applications with high demands.</p>
-              <div className="text-center mb-4">
-                <span className="text-4xl font-bold text-gray-900">$99</span>
-                <span className="text-gray-600">/month</span>
-              </div>
-              <ul className="space-y-2 text-gray-600">
-                <li>Access to all AI models</li>
-                <li>Unlimited API requests</li>
-                <li>Dedicated support</li>
-              </ul>
-              <Button className="w-full mt-4">Contact Us</Button>
             </div>
           </div>
         </div>

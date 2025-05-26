@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useToast } from '@/hooks/use-toast';
 
 interface Message {
   id: string;
@@ -17,10 +17,10 @@ interface Message {
 }
 
 const models = [
-  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', badge: 'Free & Fast', description: 'Fast responses, great for general tasks' },
-  { id: 'gpt-4o', name: 'GPT-4o', badge: 'Premium', description: 'Most capable model for complex tasks' },
-  { id: 'claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', badge: 'Premium', description: 'Excellent for analysis and writing' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', badge: 'Fast', description: 'Balanced speed and capability' },
+  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', badge: 'Free & Fast', description: 'Fast responses, great for general tasks', provider: 'google' },
+  { id: 'gpt-4o', name: 'GPT-4o', badge: 'Premium', description: 'Most capable model for complex tasks', provider: 'openai' },
+  { id: 'claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', badge: 'Premium', description: 'Excellent for analysis and writing', provider: 'anthropic' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', badge: 'Fast', description: 'Balanced speed and capability', provider: 'openai' },
 ];
 
 export const ChatPage: React.FC = () => {
@@ -28,8 +28,9 @@ export const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
+  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -42,20 +43,62 @@ export const ChatPage: React.FC = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputValue;
     setInputValue('');
     setIsLoading(true);
 
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
-      const aiMessage: Message = {
+    try {
+      const selectedModelData = models.find(m => m.id === selectedModel);
+      
+      const formData = new FormData();
+      formData.append('session_id', sessionId);
+      formData.append('question', currentInput);
+      formData.append('provider', selectedModelData?.provider || 'google');
+      formData.append('model', selectedModel);
+      formData.append('our_image_processing_algo', 'false');
+      formData.append('document_semantic_search', 'false');
+
+      const response = await fetch('/chat', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.answer) {
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: data.answer,
+          role: 'assistant',
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, aiMessage]);
+      } else {
+        throw new Error('Invalid response from server');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+      
+      // Add error message to chat
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: `This is a simulated response from ${models.find(m => m.id === selectedModel)?.name}. In a real implementation, this would be connected to the actual AI model API.`,
+        content: "Sorry, I encountered an error while processing your request. Please try again.",
         role: 'assistant',
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -71,7 +114,7 @@ export const ChatPage: React.FC = () => {
       <header className="border-b bg-white/90 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/')}>
+            <div className="flex items-center space-x-2">
               <Sparkles className="h-8 w-8 text-blue-600" />
               <span className="text-2xl font-bold text-gray-900">AIHub</span>
             </div>
@@ -143,7 +186,7 @@ export const ChatPage: React.FC = () => {
                       ? 'bg-blue-600 text-white' 
                       : 'bg-white shadow-sm border border-gray-100'
                   }`}>
-                    <p className={`text-sm ${message.role === 'user' ? 'text-white' : 'text-gray-900'}`}>
+                    <p className={`text-sm whitespace-pre-wrap ${message.role === 'user' ? 'text-white' : 'text-gray-900'}`}>
                       {message.content}
                     </p>
                   </div>

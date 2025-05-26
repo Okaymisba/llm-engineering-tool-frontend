@@ -50,6 +50,13 @@ export const ChatPage: React.FC = () => {
     try {
       const selectedModelData = models.find(m => m.id === selectedModel);
       
+      console.log('Sending chat request with:', {
+        session_id: sessionId,
+        question: currentInput,
+        provider: selectedModelData?.provider,
+        model: selectedModel
+      });
+
       const formData = new FormData();
       formData.append('session_id', sessionId);
       formData.append('question', currentInput);
@@ -58,16 +65,24 @@ export const ChatPage: React.FC = () => {
       formData.append('our_image_processing_algo', 'false');
       formData.append('document_semantic_search', 'false');
 
+      console.log('Making request to /chat endpoint...');
+      
       const response = await fetch('/chat', {
         method: 'POST',
         body: formData,
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('HTTP error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('Response data:', data);
 
       if (data.success && data.answer) {
         const aiMessage: Message = {
@@ -78,24 +93,37 @@ export const ChatPage: React.FC = () => {
         };
         setMessages(prev => [...prev, aiMessage]);
       } else {
+        console.error('Invalid response structure:', data);
         throw new Error('Invalid response from server');
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      
+      let errorMessage = "Failed to send message. Please try again.";
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = "Unable to connect to server. Please check your connection.";
+        } else if (error.message.includes('404')) {
+          errorMessage = "Chat endpoint not found. Please check server configuration.";
+        } else if (error.message.includes('500')) {
+          errorMessage = "Server error. Please try again later.";
+        }
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to send message. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
       
       // Add error message to chat
-      const errorMessage: Message = {
+      const errorChatMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: "Sorry, I encountered an error while processing your request. Please try again.",
         role: 'assistant',
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev, errorChatMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -114,7 +142,7 @@ export const ChatPage: React.FC = () => {
       <header className="border-b bg-white/90 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 cursor-default">
               <Sparkles className="h-8 w-8 text-blue-600" />
               <span className="text-2xl font-bold text-gray-900">AIHub</span>
             </div>

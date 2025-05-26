@@ -1,52 +1,22 @@
-
 import React from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Zap, Shield, DollarSign, Code, Sparkles, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const LandingPage: React.FC = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
 
-  const features = [
-    {
-      icon: <Zap className="h-6 w-6" />,
-      title: "Access Multiple AI Models",
-      description: "Choose from a wide variety of AI models including GPT, Claude, and more. Switch between models based on your specific needs."
-    },
-    {
-      icon: <DollarSign className="h-6 w-6" />,
-      title: "Pay-As-You-Go",
-      description: "No monthly subscriptions or hidden fees. Pay only for what you use with transparent, usage-based pricing."
-    },
-    {
-      icon: <Shield className="h-6 w-6" />,
-      title: "Secure & Reliable",
-      description: "Enterprise-grade security with 99.9% uptime. Your data and conversations are protected and never stored."
-    },
-    {
-      icon: <Code className="h-6 w-6" />,
-      title: "Developer-Friendly",
-      description: "Simple API integration, comprehensive documentation, and SDKs for popular programming languages."
-    }
-  ];
-
-  const pricingBenefits = [
-    "No setup fees or monthly commitments",
-    "Real-time usage tracking and billing",
-    "Volume discounts for heavy usage",
-    "Transparent pricing per model and token"
-  ];
-
-  const handleGetStarted = () => {
-    navigate('/auth');
-  };
+  if (user) {
+    navigate('/chat');
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b bg-white/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <Sparkles className="h-8 w-8 text-blue-600" />
@@ -56,8 +26,8 @@ export const LandingPage: React.FC = () => {
             <Button variant="ghost" onClick={() => navigate('/auth')}>
               Login
             </Button>
-            <Button onClick={handleGetStarted}>
-              Get Started
+            <Button onClick={() => navigate('/auth')} className="bg-blue-600 hover:bg-blue-700">
+              Sign Up
             </Button>
           </div>
         </div>
@@ -65,209 +35,190 @@ export const LandingPage: React.FC = () => {
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center">
-        <Badge variant="secondary" className="mb-6 px-4 py-2">
-          <Sparkles className="h-4 w-4 mr-2" />
-          Now supporting 15+ AI models
-        </Badge>
-        
-        <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-          Access Any AI Model,
-          <span className="text-blue-600 block">Pay Only for What You Use</span>
-        </h1>
-        
-        <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-          Choose from the best AI models available. No subscriptions, no commitments. 
-          Just powerful AI tools at your fingertips with transparent, usage-based pricing.
-        </p>
-        
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Button size="lg" onClick={handleGetStarted} className="px-8 py-3">
-            Start Building Now
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
-          <Button variant="outline" size="lg" className="px-8 py-3">
-            View Pricing
-          </Button>
-        </div>
-        
-        <div className="mt-12 text-sm text-gray-500">
-          No credit card required • Free tier available • Cancel anytime
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">How It Works</h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Get started with powerful AI models in just three simple steps
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+            Access Any AI Model,
+            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"> Pay As You Go</span>
+          </h1>
+          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            Choose from the world's best AI models including GPT-4, Claude, and Gemini. 
+            No subscriptions, no commitments — just transparent, usage-based pricing.
           </p>
-        </div>
-        
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl font-bold text-blue-600">1</span>
-            </div>
-            <h3 className="text-xl font-semibold mb-2">Sign Up & Choose</h3>
-            <p className="text-gray-600">Create your account and select from our library of AI models</p>
-          </div>
-          
-          <div className="text-center">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl font-bold text-purple-600">2</span>
-            </div>
-            <h3 className="text-xl font-semibold mb-2">Integrate & Build</h3>
-            <p className="text-gray-600">Use our simple API or web interface to start building your applications</p>
-          </div>
-          
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl font-bold text-green-600">3</span>
-            </div>
-            <h3 className="text-xl font-semibold mb-2">Pay As You Go</h3>
-            <p className="text-gray-600">Only pay for the requests you make with transparent, real-time billing</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Why Choose AIHub?</h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Built for developers, by developers. Everything you need to integrate AI into your applications.
-          </p>
-        </div>
-        
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature, index) => (
-            <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <CardHeader className="text-center pb-2">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mx-auto mb-4 text-white">
-                  {feature.icon}
-                </div>
-                <CardTitle className="text-lg">{feature.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-center">{feature.description}</CardDescription>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* Pricing Benefits */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">
-              Simple, Transparent Pricing
-            </h2>
-            <p className="text-lg text-gray-600 mb-8">
-              No hidden fees, no surprise charges. Pay only for the AI requests you make with 
-              clear, upfront pricing for each model.
-            </p>
-            
-            <div className="space-y-4">
-              {pricingBenefits.map((benefit, index) => (
-                <div key={index} className="flex items-start space-x-3">
-                  <CheckCircle className="h-6 w-6 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-700">{benefit}</span>
-                </div>
-              ))}
-            </div>
-            
-            <Button size="lg" className="mt-8" onClick={handleGetStarted}>
-              View Detailed Pricing
-              <ArrowRight className="ml-2 h-5 w-5" />
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button 
+              onClick={() => navigate('/chat')} 
+              size="lg" 
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg px-8 py-3"
+            >
+              Get Started Free
+            </Button>
+            <Button variant="outline" size="lg" className="text-lg px-8 py-3">
+              View Pricing
             </Button>
           </div>
-          
-          <Card className="p-8 border-0 shadow-xl">
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="bg-gray-50 py-16">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-8">
+            Unlock the Power of AI
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Feature 1 */}
             <div className="text-center">
-              <h3 className="text-2xl font-bold mb-4">Example Usage</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span>GPT-4 (1,000 tokens)</span>
-                  <span className="font-semibold">$0.03</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span>Claude-3 (1,000 tokens)</span>
-                  <span className="font-semibold">$0.025</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span>GPT-3.5 (1,000 tokens)</span>
-                  <span className="font-semibold">$0.002</span>
-                </div>
-                <div className="flex justify-between items-center py-2 font-bold text-lg border-t pt-4">
-                  <span>Total for today</span>
-                  <span className="text-green-600">$0.057</span>
-                </div>
-              </div>
+              <svg className="mx-auto h-12 w-12 text-blue-600 mb-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 4.75 7.5 4.75a12.742 12.742 0 00-3.214 2.056l-2.286-2.286m4.714 12.808l1.517-1.518M12 6.253V4.75a2.25 2.25 0 012.25-2.25c.976 0 1.859.579 2.592 1.565l-2.548 2.554c-.147.147-.34.229-.544.229H14.25M12 6.253z"></path>
+              </svg>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Diverse AI Models</h3>
+              <p className="text-gray-600">Access a wide range of AI models, each optimized for different tasks.</p>
             </div>
-          </Card>
+            {/* Feature 2 */}
+            <div className="text-center">
+              <svg className="mx-auto h-12 w-12 text-blue-600 mb-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h8.25a2.25 2.25 0 002.25-2.25V8.25A2.25 2.25 0 0013.5 6z"></path>
+              </svg>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Pay-As-You-Go Pricing</h3>
+              <p className="text-gray-600">Only pay for what you use. No subscriptions, no hidden fees.</p>
+            </div>
+            {/* Feature 3 */}
+            <div className="text-center">
+              <svg className="mx-auto h-12 w-12 text-blue-600 mb-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Easy Integration</h3>
+              <p className="text-gray-600">Simple API makes it easy to integrate AI into your existing workflows.</p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
-          <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Join thousands of developers already building with our AI platform. 
-            Start for free and scale as you grow.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button size="lg" variant="secondary" onClick={handleGetStarted} className="px-8 py-3">
-              Create Free Account
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button size="lg" variant="outline" className="px-8 py-3 text-white border-white hover:bg-white hover:text-blue-600">
-              View Documentation
-            </Button>
+      {/* How It Works Section */}
+      <section className="py-16">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-8">
+            How It Works
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Step 1 */}
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl font-bold text-blue-600">1</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Sign Up</h3>
+              <p className="text-gray-600">Create an account to start using AIHub.</p>
+            </div>
+            {/* Step 2 */}
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl font-bold text-blue-600">2</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Choose a Model</h3>
+              <p className="text-gray-600">Select the AI model that best fits your needs.</p>
+            </div>
+            {/* Step 3 */}
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl font-bold text-blue-600">3</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Start Creating</h3>
+              <p className="text-gray-600">Integrate the AI model into your project and start creating.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="bg-gray-50 py-16">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-8">
+            Transparent Pricing
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Pricing Tier 1 */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Free</h3>
+              <p className="text-gray-600 mb-4">Ideal for testing and small projects.</p>
+              <div className="text-center mb-4">
+                <span className="text-4xl font-bold text-gray-900">$0</span>
+                <span className="text-gray-600">/month</span>
+              </div>
+              <ul className="space-y-2 text-gray-600">
+                <li>Access to basic AI models</li>
+                <li>Limited API requests</li>
+                <li>Community support</li>
+              </ul>
+              <Button className="w-full mt-4">Get Started</Button>
+            </div>
+            {/* Pricing Tier 2 */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Standard</h3>
+              <p className="text-gray-600 mb-4">For growing projects with increased needs.</p>
+              <div className="text-center mb-4">
+                <span className="text-4xl font-bold text-gray-900">$49</span>
+                <span className="text-gray-600">/month</span>
+              </div>
+              <ul className="space-y-2 text-gray-600">
+                <li>Access to standard AI models</li>
+                <li>Increased API requests</li>
+                <li>Priority support</li>
+              </ul>
+              <Button className="w-full mt-4">Get Started</Button>
+            </div>
+            {/* Pricing Tier 3 */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Premium</h3>
+              <p className="text-gray-600 mb-4">For large-scale applications with high demands.</p>
+              <div className="text-center mb-4">
+                <span className="text-4xl font-bold text-gray-900">$99</span>
+                <span className="text-gray-600">/month</span>
+              </div>
+              <ul className="space-y-2 text-gray-600">
+                <li>Access to all AI models</li>
+                <li>Unlimited API requests</li>
+                <li>Dedicated support</li>
+              </ul>
+              <Button className="w-full mt-4">Contact Us</Button>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div className="col-span-2">
+      <footer className="border-t bg-white/80 backdrop-blur-sm">
+        <div className="container mx-auto px-4 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div className="col-span-1 md:col-span-2">
               <div className="flex items-center space-x-2 mb-4">
-                <Sparkles className="h-8 w-8 text-blue-400" />
-                <span className="text-2xl font-bold">AIHub</span>
+                <Sparkles className="h-6 w-6 text-blue-600" />
+                <span className="text-xl font-bold text-gray-900">AIHub</span>
               </div>
-              <p className="text-gray-400 max-w-md">
-                The simplest way to access and use multiple AI models with transparent, 
-                pay-as-you-go pricing.
+              <p className="text-gray-600 max-w-md">
+                The simplest way to access and use the world's best AI models. 
+                Pay only for what you use, no hidden fees.
               </p>
             </div>
-            
             <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li>Models</li>
-                <li>Pricing</li>
-                <li>Documentation</li>
-                <li>API Reference</li>
+              <h3 className="font-semibold text-gray-900 mb-4">Product</h3>
+              <ul className="space-y-2 text-gray-600">
+                <li><a href="#" className="hover:text-blue-600">Features</a></li>
+                <li><a href="#" className="hover:text-blue-600">Pricing</a></li>
+                <li><a href="#" className="hover:text-blue-600">Models</a></li>
+                <li><a href="#" className="hover:text-blue-600">API</a></li>
               </ul>
             </div>
-            
             <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li>About</li>
-                <li>Contact</li>
-                <li>Privacy Policy</li>
-                <li>Terms of Service</li>
+              <h3 className="font-semibold text-gray-900 mb-4">Company</h3>
+              <ul className="space-y-2 text-gray-600">
+                <li><a href="#" className="hover:text-blue-600">About</a></li>
+                <li><a href="#" className="hover:text-blue-600">Contact</a></li>
+                <li><a href="#" className="hover:text-blue-600">Privacy</a></li>
+                <li><a href="#" className="hover:text-blue-600">Terms</a></li>
               </ul>
             </div>
           </div>
-          
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+          <div className="border-t mt-8 pt-8 text-center text-gray-600">
             <p>&copy; 2024 AIHub. All rights reserved.</p>
           </div>
         </div>

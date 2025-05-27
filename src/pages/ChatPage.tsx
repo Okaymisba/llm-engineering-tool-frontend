@@ -29,11 +29,20 @@ export const ChatPage: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { toast } = useToast();
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
+
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "Please log in to send messages.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -65,12 +74,15 @@ export const ChatPage: React.FC = () => {
       formData.append('our_image_processing_algo', 'false');
       formData.append('document_semantic_search', 'false');
 
-      console.log('Making request to /chat endpoint...');
+      console.log('Making request to /chat endpoint with token...');
 
       const API_BASE_URL = 'http://localhost:8000';
 
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: formData,
       });
 
@@ -105,6 +117,10 @@ export const ChatPage: React.FC = () => {
       if (error instanceof Error) {
         if (error.message.includes('Failed to fetch')) {
           errorMessage = "Unable to connect to server. Please check your connection.";
+        } else if (error.message.includes('401')) {
+          errorMessage = "Authentication failed. Please log in again.";
+        } else if (error.message.includes('403')) {
+          errorMessage = "Access denied. Please check your permissions.";
         } else if (error.message.includes('404')) {
           errorMessage = "Chat endpoint not found. Please check server configuration.";
         } else if (error.message.includes('500')) {

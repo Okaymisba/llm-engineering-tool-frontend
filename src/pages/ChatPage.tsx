@@ -66,8 +66,10 @@ export const ChatPage: React.FC = () => {
       formData.append('document_semantic_search', 'false');
 
       console.log('Making request to /chat endpoint...');
-      
-      const response = await fetch('/chat', {
+
+      const API_BASE_URL = 'http://localhost:8000';
+
+      const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
         body: formData,
       });

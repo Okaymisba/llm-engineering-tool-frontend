@@ -67,10 +67,19 @@ export const ChatPage: React.FC = () => {
     }
   }, [messages, isLoading]);
 
-  // Word-by-word typing animation
+  // Faster word-by-word typing animation
   const typeMessage = (messageId: string, fullContent: string) => {
     const words = fullContent.split(' ');
     let currentWordIndex = 0;
+    
+    // Dynamic speed based on content length - faster for longer content
+    const getTypingSpeed = () => {
+      if (words.length > 150) return 15; // Very fast for long responses
+      if (words.length > 50) return 20;  // Fast for medium responses
+      return 25; // Standard speed for short responses
+    };
+    
+    const typingSpeed = getTypingSpeed();
     
     const typeNextWord = () => {
       if (currentWordIndex < words.length) {
@@ -85,7 +94,7 @@ export const ChatPage: React.FC = () => {
         );
         
         currentWordIndex++;
-        typingIntervalRef.current = setTimeout(typeNextWord, 50); // Adjust speed here
+        typingIntervalRef.current = setTimeout(typeNextWord, typingSpeed);
       } else {
         // Typing complete
         setMessages(prev => 

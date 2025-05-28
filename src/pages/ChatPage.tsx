@@ -72,11 +72,16 @@ export const ChatPage: React.FC = () => {
     const words = fullContent.split(' ');
     let currentWordIndex = 0;
     
-    // Dynamic speed based on content length - faster for longer content
+    // Dynamic speed based on content length - optimized for 2-3 second completion
     const getTypingSpeed = () => {
-      if (words.length > 150) return 15; // Very fast for long responses
-      if (words.length > 50) return 20;  // Fast for medium responses
-      return 25; // Standard speed for short responses
+      const wordCount = words.length;
+      
+      // Calculate speed to complete in 2-3 seconds
+      if (wordCount > 500) return 5;   // Very very fast for extremely long responses (1000+ words in ~2 seconds)
+      if (wordCount > 300) return 8;   // Super fast for very long responses (500+ words in ~2.5 seconds)
+      if (wordCount > 150) return 12;  // Very fast for long responses (300+ words in ~2 seconds)
+      if (wordCount > 50) return 18;   // Fast for medium responses (150+ words in ~2.5 seconds)
+      return 25; // Standard speed for short responses (under 50 words)
     };
     
     const typingSpeed = getTypingSpeed();

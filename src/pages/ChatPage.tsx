@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Settings, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +24,8 @@ interface Message {
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
+  isTyping?: boolean;
+  displayedContent?: string;
 }
 
 const models = [
@@ -37,6 +43,65 @@ export const ChatPage: React.FC = () => {
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const { user, token, logout } = useAuth();
   const { toast } = useToast();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-scroll to bottom
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Auto-focus input after AI response completes
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.isTyping && !isLoading) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }
+  }, [messages, isLoading]);
+
+  // Word-by-word typing animation
+  const typeMessage = (messageId: string, fullContent: string) => {
+    const words = fullContent.split(' ');
+    let currentWordIndex = 0;
+    
+    const typeNextWord = () => {
+      if (currentWordIndex < words.length) {
+        const displayedContent = words.slice(0, currentWordIndex + 1).join(' ');
+        
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === messageId 
+              ? { ...msg, displayedContent }
+              : msg
+          )
+        );
+        
+        currentWordIndex++;
+        typingIntervalRef.current = setTimeout(typeNextWord, 50); // Adjust speed here
+      } else {
+        // Typing complete
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === messageId 
+              ? { ...msg, isTyping: false, displayedContent: fullContent }
+              : msg
+          )
+        );
+        if (typingIntervalRef.current) {
+          clearTimeout(typingIntervalRef.current);
+        }
+      }
+    };
+
+    typeNextWord();
+  };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -61,6 +126,19 @@ export const ChatPage: React.FC = () => {
     const currentInput = inputValue;
     setInputValue('');
     setIsLoading(true);
+
+    // Create AI message placeholder
+    const aiMessageId = (Date.now() + 1).toString();
+    const aiMessage: Message = {
+      id: aiMessageId,
+      content: '',
+      role: 'assistant',
+      timestamp: new Date(),
+      isTyping: true,
+      displayedContent: '',
+    };
+
+    setMessages(prev => [...prev, aiMessage]);
 
     try {
       const selectedModelData = models.find(m => m.id === selectedModel);
@@ -105,13 +183,17 @@ export const ChatPage: React.FC = () => {
       console.log('Response data:', data);
 
       if (data.success && data.answer) {
-        const aiMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: data.answer,
-          role: 'assistant',
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, aiMessage]);
+        // Update the AI message with content and start typing animation
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === aiMessageId 
+              ? { ...msg, content: data.answer, isTyping: true }
+              : msg
+          )
+        );
+        
+        // Start word-by-word typing
+        typeMessage(aiMessageId, data.answer);
       } else {
         console.error('Invalid response structure:', data);
         throw new Error('Invalid response from server');
@@ -140,14 +222,19 @@ export const ChatPage: React.FC = () => {
         variant: "destructive",
       });
       
-      // Add error message to chat
-      const errorChatMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: "Sorry, I encountered an error while processing your request. Please try again.",
-        role: 'assistant',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorChatMessage]);
+      // Update AI message with error
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === aiMessageId 
+            ? { 
+                ...msg, 
+                content: "Sorry, I encountered an error while processing your request. Please try again.",
+                isTyping: false,
+                displayedContent: "Sorry, I encountered an error while processing your request. Please try again."
+              }
+            : msg
+        )
+      );
     } finally {
       setIsLoading(false);
     }
@@ -174,6 +261,32 @@ export const ChatPage: React.FC = () => {
       title: "Settings",
       description: "Settings page coming soon!",
     });
+  };
+
+  // Custom Markdown components for better styling
+  const markdownComponents = {
+    code: ({ node, inline, className, children, ...props }: any) => {
+      return inline ? (
+        <code className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm font-mono" {...props}>
+          {children}
+        </code>
+      ) : (
+        <pre className="bg-gray-100 text-gray-800 p-3 rounded-lg overflow-x-auto my-2">
+          <code className="font-mono text-sm" {...props}>
+            {children}
+          </code>
+        </pre>
+      );
+    },
+    p: ({ children }: any) => <p className="mb-2 last:mb-0">{children}</p>,
+    ul: ({ children }: any) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+    ol: ({ children }: any) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+    li: ({ children }: any) => <li className="text-sm">{children}</li>,
+    strong: ({ children }: any) => <strong className="font-semibold">{children}</strong>,
+    em: ({ children }: any) => <em className="italic">{children}</em>,
+    h1: ({ children }: any) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
+    h2: ({ children }: any) => <h2 className="text-lg font-semibold mb-2">{children}</h2>,
+    h3: ({ children }: any) => <h3 className="text-base font-medium mb-1">{children}</h3>,
   };
 
   return (
@@ -257,73 +370,69 @@ export const ChatPage: React.FC = () => {
       {/* Chat Interface */}
       <div className="container mx-auto max-w-4xl px-4 py-8 h-[calc(100vh-120px)] flex flex-col">
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto space-y-6 mb-6">
-          {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <Card className="p-8 text-center bg-white/80 backdrop-blur-sm border-0 shadow-xl max-w-md">
-                <Sparkles className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Start a conversation</h3>
-                <p className="text-gray-600">
-                  Ask me anything! I'm powered by {models.find(m => m.id === selectedModel)?.name}.
-                </p>
-              </Card>
-            </div>
-          ) : (
-            messages.map((message) => (
-              <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[70%] ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
-                  <div className={`rounded-2xl px-4 py-3 ${
-                    message.role === 'user' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-white shadow-sm border border-gray-100'
-                  }`}>
-                    <p className={`text-sm whitespace-pre-wrap ${message.role === 'user' ? 'text-white' : 'text-gray-900'}`}>
-                      {message.content}
+        <ScrollArea className="flex-1 mb-6">
+          <div className="space-y-6 pr-4">
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full min-h-[400px]">
+                <Card className="p-8 text-center bg-white/80 backdrop-blur-sm border-0 shadow-xl max-w-md">
+                  <Sparkles className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Start a conversation</h3>
+                  <p className="text-gray-600">
+                    Ask me anything! I'm powered by {models.find(m => m.id === selectedModel)?.name}.
+                  </p>
+                </Card>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[70%] ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
+                    <div className={`rounded-2xl px-4 py-3 ${
+                      message.role === 'user' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-white shadow-sm border border-gray-100'
+                    }`}>
+                      {message.role === 'user' ? (
+                        <p className="text-sm whitespace-pre-wrap text-white">
+                          {message.content}
+                        </p>
+                      ) : (
+                        <div className="text-sm text-gray-900 prose prose-sm max-w-none">
+                          <ReactMarkdown 
+                            components={markdownComponents}
+                            remarkPlugins={[remarkGfm]}
+                          >
+                            {message.displayedContent || message.content}
+                          </ReactMarkdown>
+                          {message.isTyping && (
+                            <span className="inline-block w-2 h-4 bg-gray-400 animate-pulse ml-1" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <p className={`text-xs text-gray-500 mt-1 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
-                  <p className={`text-xs text-gray-500 mt-1 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-                <div className={`flex items-end ${message.role === 'user' ? 'order-1 mr-3' : 'order-2 ml-3'}`}>
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className={message.role === 'user' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}>
-                      {message.role === 'user' ? user?.username?.charAt(0).toUpperCase() : 'AI'}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
-              </div>
-            ))
-          )}
-          
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="max-w-[70%] order-1">
-                <div className="bg-white shadow-sm border border-gray-100 rounded-2xl px-4 py-3">
-                  <div className="flex items-center space-x-2">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                    <span className="text-sm text-gray-500">AI is typing...</span>
+                  <div className={`flex items-end ${message.role === 'user' ? 'order-1 mr-3' : 'order-2 ml-3'}`}>
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className={message.role === 'user' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}>
+                        {message.role === 'user' ? user?.username?.charAt(0).toUpperCase() : 'AI'}
+                      </AvatarFallback>
+                    </Avatar>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-end order-2 ml-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-purple-100 text-purple-600">AI</AvatarFallback>
-                </Avatar>
-              </div>
-            </div>
-          )}
-        </div>
+              ))
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
 
         {/* Input Area */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
           <div className="flex items-end space-x-3">
             <div className="flex-1">
               <Input
+                ref={inputRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}

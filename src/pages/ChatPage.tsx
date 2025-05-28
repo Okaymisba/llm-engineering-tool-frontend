@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Settings, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -263,30 +264,139 @@ export const ChatPage: React.FC = () => {
     });
   };
 
-  // Custom Markdown components for better styling
+  // Enhanced Markdown components with syntax highlighting and better styling
   const markdownComponents = {
     code: ({ node, inline, className, children, ...props }: any) => {
-      return inline ? (
-        <code className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm font-mono" {...props}>
+      const match = /language-(\w+)/.exec(className || '');
+      const language = match ? match[1] : '';
+      
+      return !inline && language ? (
+        <div className="my-4 rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+          <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+            <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">{language}</span>
+            <button 
+              onClick={() => navigator.clipboard.writeText(String(children))}
+              className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded bg-white hover:bg-gray-100 transition-colors"
+            >
+              Copy
+            </button>
+          </div>
+          <SyntaxHighlighter
+            style={oneDark}
+            language={language}
+            PreTag="div"
+            customStyle={{
+              margin: 0,
+              padding: '1rem',
+              fontSize: '0.875rem',
+              lineHeight: '1.5',
+            }}
+            {...props}
+          >
+            {String(children).replace(/\n$/, '')}
+          </SyntaxHighlighter>
+        </div>
+      ) : (
+        <code 
+          className="bg-purple-50 text-purple-800 px-2 py-1 rounded-md text-sm font-mono border border-purple-200" 
+          {...props}
+        >
           {children}
         </code>
-      ) : (
-        <pre className="bg-gray-100 text-gray-800 p-3 rounded-lg overflow-x-auto my-2">
-          <code className="font-mono text-sm" {...props}>
-            {children}
-          </code>
-        </pre>
       );
     },
-    p: ({ children }: any) => <p className="mb-2 last:mb-0">{children}</p>,
-    ul: ({ children }: any) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-    ol: ({ children }: any) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-    li: ({ children }: any) => <li className="text-sm">{children}</li>,
-    strong: ({ children }: any) => <strong className="font-semibold">{children}</strong>,
-    em: ({ children }: any) => <em className="italic">{children}</em>,
-    h1: ({ children }: any) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
-    h2: ({ children }: any) => <h2 className="text-lg font-semibold mb-2">{children}</h2>,
-    h3: ({ children }: any) => <h3 className="text-base font-medium mb-1">{children}</h3>,
+    
+    pre: ({ children }: any) => (
+      <div className="overflow-hidden rounded-lg my-4">
+        {children}
+      </div>
+    ),
+    
+    p: ({ children }: any) => (
+      <p className="mb-4 last:mb-0 leading-relaxed text-gray-800">{children}</p>
+    ),
+    
+    ul: ({ children }: any) => (
+      <ul className="list-none mb-4 space-y-2 pl-0">{children}</ul>
+    ),
+    
+    ol: ({ children }: any) => (
+      <ol className="list-decimal list-inside mb-4 space-y-2 pl-4 text-gray-800">{children}</ol>
+    ),
+    
+    li: ({ children }: any) => (
+      <li className="flex items-start">
+        <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+        <span className="text-gray-800">{children}</span>
+      </li>
+    ),
+    
+    strong: ({ children }: any) => (
+      <strong className="font-semibold text-gray-900">{children}</strong>
+    ),
+    
+    em: ({ children }: any) => (
+      <em className="italic text-gray-700">{children}</em>
+    ),
+    
+    h1: ({ children }: any) => (
+      <h1 className="text-2xl font-bold mb-4 text-gray-900 border-b border-gray-200 pb-2">{children}</h1>
+    ),
+    
+    h2: ({ children }: any) => (
+      <h2 className="text-xl font-semibold mb-3 text-gray-900 mt-6">{children}</h2>
+    ),
+    
+    h3: ({ children }: any) => (
+      <h3 className="text-lg font-medium mb-2 text-gray-900 mt-4">{children}</h3>
+    ),
+    
+    blockquote: ({ children }: any) => (
+      <blockquote className="border-l-4 border-blue-500 pl-4 py-2 my-4 bg-blue-50 rounded-r-lg">
+        <div className="text-gray-700 italic">{children}</div>
+      </blockquote>
+    ),
+    
+    table: ({ children }: any) => (
+      <div className="overflow-x-auto my-4">
+        <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
+          {children}
+        </table>
+      </div>
+    ),
+    
+    thead: ({ children }: any) => (
+      <thead className="bg-gray-50">{children}</thead>
+    ),
+    
+    tbody: ({ children }: any) => (
+      <tbody className="divide-y divide-gray-200">{children}</tbody>
+    ),
+    
+    tr: ({ children }: any) => (
+      <tr className="hover:bg-gray-50">{children}</tr>
+    ),
+    
+    th: ({ children }: any) => (
+      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+        {children}
+      </th>
+    ),
+    
+    td: ({ children }: any) => (
+      <td className="px-4 py-3 text-sm text-gray-900">{children}</td>
+    ),
+    
+    a: ({ children, href }: any) => (
+      <a 
+        href={href} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:text-blue-800 underline decoration-blue-300 hover:decoration-blue-500 transition-colors"
+      >
+        {children}
+      </a>
+    ),
   };
 
   return (
@@ -385,18 +495,18 @@ export const ChatPage: React.FC = () => {
             ) : (
               messages.map((message) => (
                 <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[70%] ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
-                    <div className={`rounded-2xl px-4 py-3 ${
+                  <div className={`max-w-[80%] ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
+                    <div className={`rounded-2xl px-6 py-4 ${
                       message.role === 'user' 
                         ? 'bg-blue-600 text-white' 
-                        : 'bg-white shadow-sm border border-gray-100'
+                        : 'bg-white shadow-lg border border-gray-100'
                     }`}>
                       {message.role === 'user' ? (
-                        <p className="text-sm whitespace-pre-wrap text-white">
+                        <p className="text-sm whitespace-pre-wrap text-white leading-relaxed">
                           {message.content}
                         </p>
                       ) : (
-                        <div className="text-sm text-gray-900 prose prose-sm max-w-none">
+                        <div className="prose prose-sm max-w-none">
                           <ReactMarkdown 
                             components={markdownComponents}
                             remarkPlugins={[remarkGfm]}
@@ -404,12 +514,12 @@ export const ChatPage: React.FC = () => {
                             {message.displayedContent || message.content}
                           </ReactMarkdown>
                           {message.isTyping && (
-                            <span className="inline-block w-2 h-4 bg-gray-400 animate-pulse ml-1" />
+                            <span className="inline-block w-2 h-5 bg-blue-500 animate-pulse ml-1 rounded-sm" />
                           )}
                         </div>
                       )}
                     </div>
-                    <p className={`text-xs text-gray-500 mt-1 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
+                    <p className={`text-xs text-gray-500 mt-2 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
                       {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>

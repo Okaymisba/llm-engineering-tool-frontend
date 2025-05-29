@@ -11,9 +11,14 @@ import { ArrowRight, Mail, Lock } from 'lucide-react';
 interface LoginFormProps {
   onSwitchToSignup: () => void;
   onNeedVerification: (email: string) => void;
+  onForgotPassword: () => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onNeedVerification }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ 
+  onSwitchToSignup, 
+  onNeedVerification,
+  onForgotPassword 
+}) => {
   const { login, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -84,6 +89,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onNeedVe
                 required
               />
             </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              className="text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+            >
+              Forgot your password?
+            </button>
           </div>
 
           <Button type="submit" className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium" disabled={isLoading}>

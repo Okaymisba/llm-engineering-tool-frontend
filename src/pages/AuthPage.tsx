@@ -6,7 +6,7 @@ import { OTPVerification } from '@/components/auth/OTPVerification';
 import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm';
 import { ResetPasswordOTP } from '@/components/auth/ResetPasswordOTP';
 import { NewPasswordForm } from '@/components/auth/NewPasswordForm';
-import { Sparkles } from 'lucide-react';
+import { Brain } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
@@ -80,8 +80,8 @@ export const AuthPage: React.FC = () => {
       <header className="border-b bg-white/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/')}>
-            <Sparkles className="h-8 w-8 text-blue-600" />
-            <span className="text-2xl font-bold text-gray-900">AIHub</span>
+            <Brain className="h-8 w-8 text-blue-600" />
+            <span className="text-2xl font-bold text-gray-900">Syncmind</span>
           </div>
           <Button variant="ghost" onClick={() => navigate('/')}>
             Back to Home

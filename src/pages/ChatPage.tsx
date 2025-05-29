@@ -8,18 +8,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { 
   Send, 
-  Upload, 
   Brain, 
   User, 
   LogOut, 
   Loader2,
-  History,
-  FileText,
-  Image as ImageIcon,
-  Paperclip
+  History
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -28,8 +23,6 @@ interface Message {
   type: 'user' | 'ai';
   content: string;
   timestamp: Date;
-  images?: string[];
-  documents?: string[];
 }
 
 interface ChatHistory {
@@ -55,15 +48,9 @@ export const ChatPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedModel, setSelectedModel] = useState('openai:gpt-4o-mini');
-  const [uploadedImages, setUploadedImages] = useState<File[]>([]);
-  const [uploadedDocuments, setUploadedDocuments] = useState<File[]>([]);
-  const [useImageProcessing, setUseImageProcessing] = useState(false);
-  const [useDocumentSearch, setUseDocumentSearch] = useState(false);
   const [sessionId] = useState(() => `session_${Date.now()}`);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const documentInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -81,34 +68,14 @@ export const ChatPage: React.FC = () => {
     }
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    setUploadedImages(prev => [...prev, ...files]);
-  };
-
-  const handleDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    setUploadedDocuments(prev => [...prev, ...files]);
-  };
-
-  const removeImage = (index: number) => {
-    setUploadedImages(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const removeDocument = (index: number) => {
-    setUploadedDocuments(prev => prev.filter((_, i) => i !== index));
-  };
-
   const sendMessage = async () => {
-    if (!inputMessage.trim() && uploadedImages.length === 0 && uploadedDocuments.length === 0) return;
+    if (!inputMessage.trim()) return;
 
     const userMessage: Message = {
       id: `user_${Date.now()}`,
       type: 'user',
       content: inputMessage,
-      timestamp: new Date(),
-      images: uploadedImages.map(file => file.name),
-      documents: uploadedDocuments.map(file => file.name)
+      timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -146,16 +113,6 @@ export const ChatPage: React.FC = () => {
       const [provider, model] = selectedModel.split(':');
       formData.append('provider', provider.toLowerCase());
       formData.append('model', model);
-      formData.append('our_image_processing_algo', useImageProcessing.toString());
-      formData.append('document_semantic_search', useDocumentSearch.toString());
-
-      uploadedImages.forEach(image => {
-        formData.append('upload_image', image);
-      });
-
-      uploadedDocuments.forEach(document => {
-        formData.append('upload_document', document);
-      });
 
       const response = await fetch('http://localhost:8000/chat', {
         method: 'POST',
@@ -200,8 +157,6 @@ export const ChatPage: React.FC = () => {
       setMessages(prev => prev.filter(msg => msg.id !== aiMessageId));
     } finally {
       setIsLoading(false);
-      setUploadedImages([]);
-      setUploadedDocuments([]);
     }
   };
 
@@ -296,26 +251,6 @@ export const ChatPage: React.FC = () => {
                         : 'bg-gray-100 text-gray-900'
                     }`}>
                       <p className="whitespace-pre-wrap">{message.content}</p>
-                      {message.images && message.images.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {message.images.map((image, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              <ImageIcon className="h-3 w-3 mr-1" />
-                              {image}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                      {message.documents && message.documents.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {message.documents.map((doc, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              <FileText className="h-3 w-3 mr-1" />
-                              {doc}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
                       <span className="text-xs opacity-70 mt-2 block">
                         {message.timestamp.toLocaleTimeString()}
                       </span>
@@ -353,126 +288,23 @@ export const ChatPage: React.FC = () => {
               </Alert>
             )}
 
-            {/* File Uploads */}
-            {(uploadedImages.length > 0 || uploadedDocuments.length > 0) && (
-              <div className="space-y-2">
-                {uploadedImages.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {uploadedImages.map((image, index) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
-                        <ImageIcon className="h-3 w-3 mr-1" />
-                        {image.name}
-                        <button
-                          onClick={() => removeImage(index)}
-                          className="ml-1 text-red-500 hover:text-red-700"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {uploadedDocuments.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {uploadedDocuments.map((doc, index) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
-                        <FileText className="h-3 w-3 mr-1" />
-                        {doc.name}
-                        <button
-                          onClick={() => removeDocument(index)}
-                          className="ml-1 text-red-500 hover:text-red-700"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="flex items-end space-x-3">
-              {/* Image Upload Button */}
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
+            <div className="flex items-center space-x-3">
+              <Input
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                className="flex-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                 disabled={isLoading}
-                className="flex-shrink-0 h-12 w-12 border-gray-300 hover:bg-gray-50"
-              >
-                <Paperclip className="h-5 w-5" />
-              </Button>
-
-              {/* Message Input */}
-              <div className="flex-1">
-                <Textarea
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
-                  className="min-h-[48px] max-h-32 resize-none border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                  disabled={isLoading}
-                />
-              </div>
-
-              {/* Send Button */}
+              />
               <Button
                 onClick={sendMessage}
-                disabled={isLoading || (!inputMessage.trim() && uploadedImages.length === 0 && uploadedDocuments.length === 0)}
-                className="flex-shrink-0 h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={isLoading || !inputMessage.trim()}
+                className="px-6 bg-blue-600 hover:bg-blue-700 text-white"
               >
                 <Send className="h-5 w-5" />
               </Button>
             </div>
-
-            {/* Advanced Options */}
-            <div className="flex items-center space-x-6 text-sm">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useImageProcessing}
-                  onChange={(e) => setUseImageProcessing(e.target.checked)}
-                  className="rounded border-gray-300"
-                />
-                <span className="text-gray-700">Image Processing</span>
-              </label>
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useDocumentSearch}
-                  onChange={(e) => setUseDocumentSearch(e.target.checked)}
-                  className="rounded border-gray-300"
-                />
-                <span className="text-gray-700">Document Search</span>
-              </label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => documentInputRef.current?.click()}
-                disabled={isLoading}
-                className="text-gray-600 hover:text-gray-800"
-              >
-                <Upload className="h-4 w-4 mr-1" />
-                Upload Document
-              </Button>
-            </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImageUpload}
-              className="hidden"
-            />
-            <input
-              ref={documentInputRef}
-              type="file"
-              accept=".pdf,.doc,.docx,.txt"
-              multiple
-              onChange={handleDocumentUpload}
-              className="hidden"
-            />
           </div>
         </Card>
       </div>

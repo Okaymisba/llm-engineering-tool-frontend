@@ -18,7 +18,8 @@ import {
   Loader2,
   History,
   FileText,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Paperclip
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -36,6 +37,16 @@ interface ChatHistory {
   answer: string;
 }
 
+const modelOptions = [
+  { provider: 'OpenAI', model: 'gpt-4o', value: 'openai:gpt-4o', isFree: false },
+  { provider: 'OpenAI', model: 'gpt-4o-mini', value: 'openai:gpt-4o-mini', isFree: true },
+  { provider: 'OpenAI', model: 'gpt-3.5-turbo', value: 'openai:gpt-3.5-turbo', isFree: true },
+  { provider: 'Anthropic', model: 'claude-3-5-sonnet', value: 'anthropic:claude-3-5-sonnet', isFree: false },
+  { provider: 'Anthropic', model: 'claude-3-haiku', value: 'anthropic:claude-3-haiku', isFree: true },
+  { provider: 'Google', model: 'gemini-pro', value: 'google:gemini-pro', isFree: true },
+  { provider: 'Google', model: 'gemini-1.5-pro', value: 'google:gemini-1.5-pro', isFree: false },
+];
+
 export const ChatPage: React.FC = () => {
   const { user, logout } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -43,8 +54,7 @@ export const ChatPage: React.FC = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState('openai');
-  const [selectedModel, setSelectedModel] = useState('gpt-4');
+  const [selectedModel, setSelectedModel] = useState('openai:gpt-4o-mini');
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [uploadedDocuments, setUploadedDocuments] = useState<File[]>([]);
   const [useImageProcessing, setUseImageProcessing] = useState(false);
@@ -119,20 +129,25 @@ export const ChatPage: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append('session_id', sessionId);
-      formData.append('question', inputMessage);
-      formData.append('provider', selectedProvider);
-      formData.append('model', selectedModel);
-      formData.append('our_image_processing_algo', useImageProcessing.toString());
-      formData.append('document_semantic_search', useDocumentSearch.toString());
-
-      // Add context from previous conversations
+      
+      // Include context from previous conversations
+      let contextualQuestion = inputMessage;
       if (chatHistory.length > 0) {
         const recentHistory = chatHistory.slice(-2); // Last 2 Q&A pairs
-        const contextMessage = recentHistory.map(h => 
+        const context = recentHistory.map(h => 
           `Previous Q: ${h.question}\nPrevious A: ${h.answer}`
-        ).join('\n\n') + `\n\nCurrent Question: ${inputMessage}`;
-        formData.set('question', contextMessage);
+        ).join('\n\n');
+        contextualQuestion = `${context}\n\nCurrent Question: ${inputMessage}`;
       }
+      
+      formData.append('question', contextualQuestion);
+      
+      // Parse provider and model from selected value
+      const [provider, model] = selectedModel.split(':');
+      formData.append('provider', provider.toLowerCase());
+      formData.append('model', model);
+      formData.append('our_image_processing_algo', useImageProcessing.toString());
+      formData.append('document_semantic_search', useDocumentSearch.toString());
 
       uploadedImages.forEach(image => {
         formData.append('upload_image', image);
@@ -201,12 +216,37 @@ export const ChatPage: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-4">
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-2">
               <Brain className="h-8 w-8 text-blue-600" />
               <span className="text-2xl font-bold text-gray-900">Syncmind</span>
             </div>
+            
+            {/* Model Selection */}
+            <div className="flex items-center space-x-3">
+              <label className="text-sm font-medium text-gray-700">Model:</label>
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger className="w-64 bg-white border-gray-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60">
+                  {modelOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value} className="cursor-pointer hover:bg-gray-50">
+                      <span className="flex items-center space-x-2">
+                        <span>{option.provider}: {option.model}</span>
+                        {option.isFree && (
+                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+                            Free
+                          </Badge>
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <Button variant="outline" size="sm" className="flex items-center space-x-2">
               <History className="h-4 w-4" />
               <span>Chat History</span>
@@ -231,243 +271,210 @@ export const ChatPage: React.FC = () => {
 
       {/* Main Chat Area */}
       <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Settings Panel */}
-          <div className="lg:col-span-1">
-            <Card className="bg-white/90 backdrop-blur-sm">
-              <CardContent className="p-4 space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Provider</label>
-                  <Select value={selectedProvider} onValueChange={setSelectedProvider}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="openai">OpenAI</SelectItem>
-                      <SelectItem value="anthropic">Anthropic</SelectItem>
-                      <SelectItem value="google">Google</SelectItem>
-                    </SelectContent>
-                  </Select>
+        <Card className="bg-white/90 backdrop-blur-sm h-[75vh] flex flex-col shadow-xl">
+          <ScrollArea className="flex-1 p-6">
+            <div className="space-y-6">
+              {messages.length === 0 && (
+                <div className="text-center py-12">
+                  <Brain className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Welcome to Syncmind</h3>
+                  <p className="text-gray-600">Start a conversation with our AI assistant</p>
                 </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Model</label>
-                  <Select value={selectedModel} onValueChange={setSelectedModel}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gpt-4">GPT-4</SelectItem>
-                      <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
-                      <SelectItem value="claude-3">Claude 3</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={useImageProcessing}
-                      onChange={(e) => setUseImageProcessing(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span className="text-sm text-gray-700">Image Processing</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={useDocumentSearch}
-                      onChange={(e) => setUseDocumentSearch(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span className="text-sm text-gray-700">Document Search</span>
-                  </label>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Chat Messages */}
-          <div className="lg:col-span-3">
-            <Card className="bg-white/90 backdrop-blur-sm h-[70vh] flex flex-col">
-              <ScrollArea className="flex-1 p-6">
-                <div className="space-y-6">
-                  {messages.length === 0 && (
-                    <div className="text-center py-12">
-                      <Brain className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to Syncmind</h3>
-                      <p className="text-gray-600">Start a conversation with our AI assistant</p>
-                    </div>
-                  )}
-                  
-                  {messages.map((message) => (
-                    <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`flex space-x-3 max-w-[80%] ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                        <Avatar className="h-8 w-8 flex-shrink-0">
-                          <AvatarFallback>
-                            {message.type === 'user' ? <User className="h-4 w-4" /> : <Brain className="h-4 w-4" />}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className={`rounded-lg p-4 ${
-                          message.type === 'user' 
-                            ? 'bg-blue-600 text-white' 
-                            : 'bg-gray-100 text-gray-900'
-                        }`}>
-                          <p className="whitespace-pre-wrap">{message.content}</p>
-                          {message.images && message.images.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {message.images.map((image, index) => (
-                                <Badge key={index} variant="secondary" className="text-xs">
-                                  <ImageIcon className="h-3 w-3 mr-1" />
-                                  {image}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                          {message.documents && message.documents.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {message.documents.map((doc, index) => (
-                                <Badge key={index} variant="secondary" className="text-xs">
-                                  <FileText className="h-3 w-3 mr-1" />
-                                  {doc}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                          <span className="text-xs opacity-70 mt-2 block">
-                            {message.timestamp.toLocaleTimeString()}
-                          </span>
+              )}
+              
+              {messages.map((message) => (
+                <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`flex space-x-3 max-w-[80%] ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                    <Avatar className="h-8 w-8 flex-shrink-0">
+                      <AvatarFallback className={message.type === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100'}>
+                        {message.type === 'user' ? <User className="h-4 w-4" /> : <Brain className="h-4 w-4" />}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className={`rounded-2xl p-4 ${
+                      message.type === 'user' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-100 text-gray-900'
+                    }`}>
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      {message.images && message.images.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {message.images.map((image, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              <ImageIcon className="h-3 w-3 mr-1" />
+                              {image}
+                            </Badge>
+                          ))}
                         </div>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {isLoading && (
-                    <div className="flex justify-start">
-                      <div className="flex space-x-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback>
-                            <Brain className="h-4 w-4" />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="bg-gray-100 rounded-lg p-4">
-                          <div className="flex items-center space-x-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span className="text-gray-600">Generating response...</span>
-                          </div>
+                      )}
+                      {message.documents && message.documents.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {message.documents.map((doc, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              <FileText className="h-3 w-3 mr-1" />
+                              {doc}
+                            </Badge>
+                          ))}
                         </div>
+                      )}
+                      <span className="text-xs opacity-70 mt-2 block">
+                        {message.timestamp.toLocaleTimeString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="flex space-x-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-gray-100">
+                        <Brain className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="bg-gray-100 rounded-2xl p-4">
+                      <div className="flex items-center space-x-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-gray-600">Generating response...</span>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
-                <div ref={messagesEndRef} />
-              </ScrollArea>
+              )}
+            </div>
+            <div ref={messagesEndRef} />
+          </ScrollArea>
 
-              {/* Input Area */}
-              <div className="border-t p-4 space-y-4">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
+          {/* Input Area */}
+          <div className="border-t p-6 space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-                {/* File Uploads */}
-                {(uploadedImages.length > 0 || uploadedDocuments.length > 0) && (
-                  <div className="space-y-2">
-                    {uploadedImages.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {uploadedImages.map((image, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            <ImageIcon className="h-3 w-3 mr-1" />
-                            {image.name}
-                            <button
-                              onClick={() => removeImage(index)}
-                              className="ml-1 text-red-500 hover:text-red-700"
-                            >
-                              ×
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    {uploadedDocuments.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {uploadedDocuments.map((doc, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            <FileText className="h-3 w-3 mr-1" />
-                            {doc.name}
-                            <button
-                              onClick={() => removeDocument(index)}
-                              className="ml-1 text-red-500 hover:text-red-700"
-                            >
-                              ×
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+            {/* File Uploads */}
+            {(uploadedImages.length > 0 || uploadedDocuments.length > 0) && (
+              <div className="space-y-2">
+                {uploadedImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {uploadedImages.map((image, index) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        <ImageIcon className="h-3 w-3 mr-1" />
+                        {image.name}
+                        <button
+                          onClick={() => removeImage(index)}
+                          className="ml-1 text-red-500 hover:text-red-700"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
                   </div>
                 )}
-
-                <div className="flex space-x-2">
-                  <div className="flex-1">
-                    <Textarea
-                      value={inputMessage}
-                      onChange={(e) => setInputMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Type your message..."
-                      className="min-h-[50px] resize-none"
-                      disabled={isLoading}
-                    />
+                {uploadedDocuments.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {uploadedDocuments.map((doc, index) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        <FileText className="h-3 w-3 mr-1" />
+                        {doc.name}
+                        <button
+                          onClick={() => removeDocument(index)}
+                          className="ml-1 text-red-500 hover:text-red-700"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
                   </div>
-                  <div className="flex flex-col space-y-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isLoading}
-                    >
-                      <ImageIcon className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => documentInputRef.current?.click()}
-                      disabled={isLoading}
-                    >
-                      <Upload className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      onClick={sendMessage}
-                      disabled={isLoading || (!inputMessage.trim() && uploadedImages.length === 0 && uploadedDocuments.length === 0)}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                )}
+              </div>
+            )}
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-                <input
-                  ref={documentInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt"
-                  multiple
-                  onChange={handleDocumentUpload}
-                  className="hidden"
+            <div className="flex items-end space-x-3">
+              {/* Image Upload Button */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                className="flex-shrink-0 h-12 w-12 border-gray-300 hover:bg-gray-50"
+              >
+                <Paperclip className="h-5 w-5" />
+              </Button>
+
+              {/* Message Input */}
+              <div className="flex-1">
+                <Textarea
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Type your message..."
+                  className="min-h-[48px] max-h-32 resize-none border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  disabled={isLoading}
                 />
               </div>
-            </Card>
+
+              {/* Send Button */}
+              <Button
+                onClick={sendMessage}
+                disabled={isLoading || (!inputMessage.trim() && uploadedImages.length === 0 && uploadedDocuments.length === 0)}
+                className="flex-shrink-0 h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Send className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Advanced Options */}
+            <div className="flex items-center space-x-6 text-sm">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useImageProcessing}
+                  onChange={(e) => setUseImageProcessing(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-gray-700">Image Processing</span>
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useDocumentSearch}
+                  onChange={(e) => setUseDocumentSearch(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-gray-700">Document Search</span>
+              </label>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => documentInputRef.current?.click()}
+                disabled={isLoading}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                <Upload className="h-4 w-4 mr-1" />
+                Upload Document
+              </Button>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+            <input
+              ref={documentInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.txt"
+              multiple
+              onChange={handleDocumentUpload}
+              className="hidden"
+            />
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

@@ -25,8 +25,7 @@ interface Message {
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
-  isTyping?: boolean;
-  displayedContent?: string;
+  isStreaming?: boolean;
 }
 
 const models = [
@@ -46,7 +45,7 @@ export const ChatPage: React.FC = () => {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
@@ -60,63 +59,12 @@ export const ChatPage: React.FC = () => {
   // Auto-focus input after AI response completes
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
-    if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.isTyping && !isLoading) {
+    if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.isStreaming && !isLoading) {
       setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
     }
   }, [messages, isLoading]);
-
-  // Faster word-by-word typing animation
-  const typeMessage = (messageId: string, fullContent: string) => {
-    const words = fullContent.split(' ');
-    let currentWordIndex = 0;
-    
-    // Dynamic speed based on content length - optimized for 2-3 second completion
-    const getTypingSpeed = () => {
-      const wordCount = words.length;
-      
-      // Calculate speed to complete in 2-3 seconds
-      if (wordCount > 500) return 5;   // Very very fast for extremely long responses (1000+ words in ~2 seconds)
-      if (wordCount > 300) return 8;   // Super fast for very long responses (500+ words in ~2.5 seconds)
-      if (wordCount > 150) return 12;  // Very fast for long responses (300+ words in ~2 seconds)
-      if (wordCount > 50) return 18;   // Fast for medium responses (150+ words in ~2.5 seconds)
-      return 25; // Standard speed for short responses (under 50 words)
-    };
-    
-    const typingSpeed = getTypingSpeed();
-    
-    const typeNextWord = () => {
-      if (currentWordIndex < words.length) {
-        const displayedContent = words.slice(0, currentWordIndex + 1).join(' ');
-        
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === messageId 
-              ? { ...msg, displayedContent }
-              : msg
-          )
-        );
-        
-        currentWordIndex++;
-        typingIntervalRef.current = setTimeout(typeNextWord, typingSpeed);
-      } else {
-        // Typing complete
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === messageId 
-              ? { ...msg, isTyping: false, displayedContent: fullContent }
-              : msg
-          )
-        );
-        if (typingIntervalRef.current) {
-          clearTimeout(typingIntervalRef.current);
-        }
-      }
-    };
-
-    typeNextWord();
-  };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -149,8 +97,7 @@ export const ChatPage: React.FC = () => {
       content: '',
       role: 'assistant',
       timestamp: new Date(),
-      isTyping: true,
-      displayedContent: '',
+      isStreaming: true,
     };
 
     setMessages(prev => [...prev, aiMessage]);
@@ -173,9 +120,12 @@ export const ChatPage: React.FC = () => {
       formData.append('our_image_processing_algo', 'false');
       formData.append('document_semantic_search', 'false');
 
-      console.log('Making request to /chat endpoint with token...');
+      console.log('Making streaming request to /chat endpoint...');
 
       const API_BASE_URL = 'http://localhost:8000';
+
+      // Create abort controller for this request
+      abortControllerRef.current = new AbortController();
 
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
@@ -183,10 +133,10 @@ export const ChatPage: React.FC = () => {
           'Authorization': `Bearer ${token}`,
         },
         body: formData,
+        signal: abortControllerRef.current.signal,
       });
 
       console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -194,27 +144,51 @@ export const ChatPage: React.FC = () => {
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
-      const data = await response.json();
-      console.log('Response data:', data);
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = '';
 
-      if (data.success && data.answer) {
-        // Update the AI message with content and start typing animation
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === aiMessageId 
-              ? { ...msg, content: data.answer, isTyping: true }
-              : msg
-          )
-        );
-        
-        // Start word-by-word typing
-        typeMessage(aiMessageId, data.answer);
-      } else {
-        console.error('Invalid response structure:', data);
-        throw new Error('Invalid response from server');
+      if (reader) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            accumulatedContent += chunk;
+            
+            // Update the message with accumulated content
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === aiMessageId 
+                  ? { ...msg, content: accumulatedContent }
+                  : msg
+              )
+            );
+          }
+        } finally {
+          reader.releaseLock();
+        }
       }
+
+      // Mark streaming as complete
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === aiMessageId 
+            ? { ...msg, isStreaming: false }
+            : msg
+        )
+      );
+
     } catch (error) {
       console.error('Error sending message:', error);
+      
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Request was aborted, don't show error toast
+        return;
+      }
       
       let errorMessage = "Failed to send message. Please try again.";
       if (error instanceof Error) {
@@ -244,14 +218,14 @@ export const ChatPage: React.FC = () => {
             ? { 
                 ...msg, 
                 content: "Sorry, I encountered an error while processing your request. Please try again.",
-                isTyping: false,
-                displayedContent: "Sorry, I encountered an error while processing your request. Please try again."
+                isStreaming: false
               }
             : msg
         )
       );
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -521,14 +495,23 @@ export const ChatPage: React.FC = () => {
                         </p>
                       ) : (
                         <div className="prose prose-sm max-w-none">
-                          <ReactMarkdown 
-                            components={markdownComponents}
-                            remarkPlugins={[remarkGfm]}
-                          >
-                            {message.displayedContent || message.content}
-                          </ReactMarkdown>
-                          {message.isTyping && (
-                            <span className="inline-block w-2 h-5 bg-blue-500 animate-pulse ml-1 rounded-sm" />
+                          {message.isStreaming && !message.content ? (
+                            <div className="flex items-center space-x-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                              <span className="text-gray-600">Generating response...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <ReactMarkdown 
+                                components={markdownComponents}
+                                remarkPlugins={[remarkGfm]}
+                              >
+                                {message.content}
+                              </ReactMarkdown>
+                              {message.isStreaming && (
+                                <span className="inline-block w-2 h-5 bg-blue-500 animate-pulse ml-1 rounded-sm" />
+                              )}
+                            </>
                           )}
                         </div>
                       )}

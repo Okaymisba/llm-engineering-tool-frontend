@@ -6,6 +6,7 @@ import { OTPVerification } from '@/components/auth/OTPVerification';
 import { Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 
 type AuthStep = 'login' | 'signup' | 'verify-otp';
 
@@ -13,6 +14,9 @@ export const AuthPage: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<AuthStep>('login');
   const [signupData, setSignupData] = useState<{ email: string; username: string } | null>(null);
   const navigate = useNavigate();
+
+  // Handle automatic redirect after successful login
+  useAuthRedirect();
 
   const handleSwitchToSignup = () => setCurrentStep('signup');
   const handleSwitchToLogin = () => setCurrentStep('login');

@@ -1,10 +1,12 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Settings, LogOut, Paperclip, X, History } from 'lucide-react';
+import { Send, Sparkles, Settings, LogOut, Paperclip, X, History, Image, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +29,13 @@ interface Message {
   role: 'user' | 'assistant';
   timestamp: Date;
   isStreaming?: boolean;
+  reasoning?: string;
+  isReasoningComplete?: boolean;
+  metadata?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 interface UploadedFile {
@@ -37,7 +46,7 @@ interface UploadedFile {
 
 const models = [
   { id: 'gemini-2.0-flash', name: 'Google: Gemini 2.0 Flash', badge: 'Free', description: 'Fast responses, great for general tasks', provider: 'google' },
-  { id: 'Deepseek-r1-0528:free', name: 'Deepseek: R1 (Reasoning)', badge: 'Free', description: 'Advanced reasoning capabilities', provider: 'deepseek' },
+  { id: 'Deepseek-r1-0528:free', name: 'Deepseek: R1 (Reasoning)', badge: 'Free', description: 'Advanced reasoning capabilities', provider: 'deepseek', isReasoning: true },
   { id: 'Deepseek-chat-v3-0324:free', name: 'Deepseek: V3', badge: 'Free', description: 'Powerful conversational AI', provider: 'deepseek' },
   { id: 'gpt-4o', name: 'OpenAI: GPT-4o', badge: 'Paid', description: 'Most capable model for complex tasks', provider: 'openai' },
   { id: 'claude-3.5-sonnet', name: 'Anthropic: Claude 3.5 Sonnet', badge: 'Paid', description: 'Excellent for analysis and writing', provider: 'anthropic' },
@@ -50,15 +59,16 @@ export const ChatPage: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isUploadExpanded, setIsUploadExpanded] = useState(false);
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const { user, token, logout } = useAuth();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Auto-scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -67,7 +77,6 @@ export const ChatPage: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Auto-focus input after AI response completes
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.isStreaming && !isLoading) {
@@ -77,21 +86,21 @@ export const ChatPage: React.FC = () => {
     }
   }, [messages, isLoading]);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'image' | 'document') => {
     const files = event.target.files;
     if (!files) return;
 
     Array.from(files).forEach((file) => {
-      const isImage = file.type.startsWith('image/');
-      const isDocument = file.type === 'application/pdf' || file.type.includes('document') || file.type.includes('text');
+      const isValidImage = file.type.startsWith('image/') && fileType === 'image';
+      const isValidDocument = (file.type === 'application/pdf' || file.type.includes('document') || file.type.includes('text')) && fileType === 'document';
       
-      if (isImage || isDocument) {
+      if (isValidImage || isValidDocument) {
         const uploadedFile: UploadedFile = {
           file,
-          type: isImage ? 'image' : 'document'
+          type: fileType
         };
 
-        if (isImage) {
+        if (isValidImage) {
           const reader = new FileReader();
           reader.onload = (e) => {
             uploadedFile.preview = e.target?.result as string;
@@ -103,17 +112,18 @@ export const ChatPage: React.FC = () => {
         }
       } else {
         toast({
-          title: "Unsupported file type",
-          description: "Please upload images or documents only.",
+          title: "Invalid file type",
+          description: `Please select valid ${fileType} files only.`,
           variant: "destructive",
         });
       }
     });
 
     // Clear the input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    if (event.target) {
+      event.target.value = '';
     }
+    setIsUploadExpanded(false);
   };
 
   const removeFile = (index: number) => {
@@ -146,21 +156,23 @@ export const ChatPage: React.FC = () => {
     setUploadedFiles([]);
     setIsLoading(true);
 
-    // Create AI message placeholder
     const aiMessageId = (Date.now() + 1).toString();
+    const selectedModelData = models.find(m => m.id === selectedModel);
+    const isReasoningModel = selectedModelData?.isReasoning || false;
+    
     const aiMessage: Message = {
       id: aiMessageId,
       content: '',
       role: 'assistant',
       timestamp: new Date(),
       isStreaming: true,
+      reasoning: isReasoningModel ? '' : undefined,
+      isReasoningComplete: false,
     };
 
     setMessages(prev => [...prev, aiMessage]);
 
     try {
-      const selectedModelData = models.find(m => m.id === selectedModel);
-      
       console.log('Sending chat request with:', {
         session_id: sessionId,
         question: currentInput,
@@ -177,7 +189,6 @@ export const ChatPage: React.FC = () => {
       formData.append('our_image_processing_algo', 'false');
       formData.append('document_semantic_search', 'false');
 
-      // Add uploaded files
       currentFiles.forEach((uploadedFile) => {
         if (uploadedFile.type === 'image') {
           formData.append('upload_image', uploadedFile.file);
@@ -189,8 +200,6 @@ export const ChatPage: React.FC = () => {
       console.log('Making streaming request to /chat endpoint...');
 
       const API_BASE_URL = 'http://localhost:8000';
-
-      // Create abort controller for this request
       abortControllerRef.current = new AbortController();
 
       const response = await fetch(`${API_BASE_URL}/chat`, {
@@ -210,10 +219,11 @@ export const ChatPage: React.FC = () => {
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
-      // Handle streaming response
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let accumulatedContent = '';
+      let accumulatedReasoning = '';
+      let isReasoningPhase = isReasoningModel;
 
       if (reader) {
         try {
@@ -223,27 +233,68 @@ export const ChatPage: React.FC = () => {
             if (done) break;
             
             const chunk = decoder.decode(value, { stream: true });
-            accumulatedContent += chunk;
             
-            // Update the message with accumulated content
-            setMessages(prev => 
-              prev.map(msg => 
-                msg.id === aiMessageId 
-                  ? { ...msg, content: accumulatedContent }
-                  : msg
-              )
-            );
+            try {
+              const parsed = JSON.parse(chunk);
+              
+              if (parsed.type === 'reasoning') {
+                accumulatedReasoning += parsed.data;
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, reasoning: accumulatedReasoning }
+                      : msg
+                  )
+                );
+              } else if (parsed.type === 'content') {
+                if (isReasoningPhase) {
+                  isReasoningPhase = false;
+                  setMessages(prev => 
+                    prev.map(msg => 
+                      msg.id === aiMessageId 
+                        ? { ...msg, isReasoningComplete: true }
+                        : msg
+                    )
+                  );
+                }
+                accumulatedContent += parsed.data;
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, content: accumulatedContent }
+                      : msg
+                  )
+                );
+              } else if (parsed.type === 'metadata') {
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, metadata: parsed.data }
+                      : msg
+                  )
+                );
+              }
+            } catch (e) {
+              // If not JSON, treat as plain text content
+              accumulatedContent += chunk;
+              setMessages(prev => 
+                prev.map(msg => 
+                  msg.id === aiMessageId 
+                    ? { ...msg, content: accumulatedContent }
+                    : msg
+                )
+              );
+            }
           }
         } finally {
           reader.releaseLock();
         }
       }
 
-      // Mark streaming as complete
       setMessages(prev => 
         prev.map(msg => 
           msg.id === aiMessageId 
-            ? { ...msg, isStreaming: false }
+            ? { ...msg, isStreaming: false, isReasoningComplete: true }
             : msg
         )
       );
@@ -252,7 +303,6 @@ export const ChatPage: React.FC = () => {
       console.error('Error sending message:', error);
       
       if (error instanceof Error && error.name === 'AbortError') {
-        // Request was aborted, don't show error toast
         return;
       }
       
@@ -277,7 +327,6 @@ export const ChatPage: React.FC = () => {
         variant: "destructive",
       });
       
-      // Update AI message with error
       setMessages(prev => 
         prev.map(msg => 
           msg.id === aiMessageId 
@@ -311,7 +360,6 @@ export const ChatPage: React.FC = () => {
   };
 
   const handleSettings = () => {
-    // Placeholder for settings functionality
     toast({
       title: "Settings",
       description: "Settings page coming soon!",
@@ -578,6 +626,32 @@ export const ChatPage: React.FC = () => {
                         </p>
                       ) : (
                         <div className="prose prose-sm max-w-none">
+                          {/* Reasoning Section for Reasoning Models */}
+                          {message.reasoning !== undefined && (
+                            <Collapsible className="mb-4">
+                              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors">
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                                  <span className="text-sm font-medium text-amber-800">
+                                    {message.isReasoningComplete ? 'Reasoning Complete' : 'Thinking...'}
+                                  </span>
+                                </div>
+                                <ChevronDown className="h-4 w-4 text-amber-600 transition-transform duration-200" />
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="mt-2">
+                                <div className="p-4 bg-amber-25 border border-amber-100 rounded-lg">
+                                  <div className="text-sm text-amber-900 whitespace-pre-wrap font-mono">
+                                    {message.reasoning}
+                                    {!message.isReasoningComplete && (
+                                      <span className="inline-block w-2 h-4 bg-amber-500 animate-pulse ml-1 rounded-sm" />
+                                    )}
+                                  </div>
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          )}
+                          
+                          {/* Main Content */}
                           {message.isStreaming && !message.content ? (
                             <div className="flex items-center space-x-2">
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
@@ -595,6 +669,13 @@ export const ChatPage: React.FC = () => {
                                 <span className="inline-block w-2 h-5 bg-blue-500 animate-pulse ml-1 rounded-sm" />
                               )}
                             </>
+                          )}
+                          
+                          {/* Metadata */}
+                          {message.metadata && (
+                            <div className="mt-4 p-2 bg-gray-50 rounded text-xs text-gray-600">
+                              Tokens: {message.metadata.prompt_tokens} + {message.metadata.completion_tokens} = {message.metadata.total_tokens}
+                            </div>
                           )}
                         </div>
                       )}
@@ -628,7 +709,7 @@ export const ChatPage: React.FC = () => {
                     <img src={file.preview} alt={file.file.name} className="w-8 h-8 object-cover rounded" />
                   ) : (
                     <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                      <Paperclip className="h-4 w-4 text-blue-600" />
+                      <FileText className="h-4 w-4 text-blue-600" />
                     </div>
                   )}
                   <span className="text-sm text-gray-700 truncate flex-1">{file.file.name}</span>
@@ -644,22 +725,53 @@ export const ChatPage: React.FC = () => {
           )}
           
           <div className="flex items-end space-x-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              className="h-10 w-10 text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-              disabled={isLoading}
-            >
-              <Paperclip className="h-4 w-4" />
-            </Button>
+            {/* Expandable Upload Button */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsUploadExpanded(!isUploadExpanded)}
+                className="h-10 w-10 text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                disabled={isLoading}
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              
+              {isUploadExpanded && (
+                <div className="absolute bottom-12 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-2 space-y-1 animate-fade-in">
+                  <button
+                    onClick={() => imageInputRef.current?.click()}
+                    className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
+                  >
+                    <Image className="h-4 w-4 text-blue-500" />
+                    <span>Upload Image</span>
+                  </button>
+                  <button
+                    onClick={() => documentInputRef.current?.click()}
+                    className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
+                  >
+                    <FileText className="h-4 w-4 text-green-500" />
+                    <span>Upload Document</span>
+                  </button>
+                </div>
+              )}
+            </div>
             
             <input
-              ref={fileInputRef}
+              ref={imageInputRef}
               type="file"
               multiple
-              accept="image/*,.pdf,.doc,.docx,.txt"
-              onChange={handleFileUpload}
+              accept="image/*"
+              onChange={(e) => handleFileUpload(e, 'image')}
+              className="hidden"
+            />
+            
+            <input
+              ref={documentInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx,.txt"
+              onChange={(e) => handleFileUpload(e, 'document')}
               className="hidden"
             />
             

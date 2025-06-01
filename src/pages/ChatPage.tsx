@@ -1,19 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Settings, LogOut, Paperclip, X, History, Image, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Sparkles, Settings, LogOut, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +15,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
+import { ChatMessage } from '@/components/chat/ChatMessage';
+import { FileUpload } from '@/components/chat/FileUpload';
+import { ModelSelector, models } from '@/components/chat/ModelSelector';
 
 interface Message {
   id: string;
@@ -44,29 +40,17 @@ interface UploadedFile {
   preview?: string;
 }
 
-const models = [
-  { id: 'gemini-2.0-flash', name: 'Google: Gemini 2.0 Flash', badge: 'Free', description: 'Fast responses, great for general tasks', provider: 'google' },
-  { id: 'Deepseek-r1-0528:free', name: 'Deepseek: R1 (Reasoning)', badge: 'Free', description: 'Advanced reasoning capabilities', provider: 'deepseek', isReasoning: true },
-  { id: 'Deepseek-chat-v3-0324:free', name: 'Deepseek: V3', badge: 'Free', description: 'Powerful conversational AI', provider: 'deepseek' },
-  { id: 'gpt-4o', name: 'OpenAI: GPT-4o', badge: 'Paid', description: 'Most capable model for complex tasks', provider: 'openai' },
-  { id: 'claude-3.5-sonnet', name: 'Anthropic: Claude 3.5 Sonnet', badge: 'Paid', description: 'Excellent for analysis and writing', provider: 'anthropic' },
-  { id: 'gpt-4o-mini', name: 'OpenAI: GPT-4o Mini', badge: 'Paid', description: 'Balanced speed and capability', provider: 'openai' },
-];
-
 export const ChatPage: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [isUploadExpanded, setIsUploadExpanded] = useState(false);
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const { user, token, logout } = useAuth();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const documentInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const scrollToBottom = () => {
@@ -86,48 +70,8 @@ export const ChatPage: React.FC = () => {
     }
   }, [messages, isLoading]);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'image' | 'document') => {
-    const files = event.target.files;
-    if (!files) return;
-
-    Array.from(files).forEach((file) => {
-      const isValidImage = file.type.startsWith('image/') && fileType === 'image';
-      const isValidDocument = (file.type === 'application/pdf' || file.type.includes('document') || file.type.includes('text')) && fileType === 'document';
-      
-      if (isValidImage || isValidDocument) {
-        const uploadedFile: UploadedFile = {
-          file,
-          type: fileType
-        };
-
-        if (isValidImage) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            uploadedFile.preview = e.target?.result as string;
-            setUploadedFiles(prev => [...prev, uploadedFile]);
-          };
-          reader.readAsDataURL(file);
-        } else {
-          setUploadedFiles(prev => [...prev, uploadedFile]);
-        }
-      } else {
-        toast({
-          title: "Invalid file type",
-          description: `Please select valid ${fileType} files only.`,
-          variant: "destructive",
-        });
-      }
-    });
-
-    // Clear the input
-    if (event.target) {
-      event.target.value = '';
-    }
-    setIsUploadExpanded(false);
-  };
-
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  const handleFileAdded = (newFiles: UploadedFile[]) => {
+    setUploadedFiles(prev => [...prev, ...newFiles]);
   };
 
   const handleSendMessage = async () => {
@@ -212,6 +156,7 @@ export const ChatPage: React.FC = () => {
       });
 
       console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -224,66 +169,88 @@ export const ChatPage: React.FC = () => {
       let accumulatedContent = '';
       let accumulatedReasoning = '';
       let isReasoningPhase = isReasoningModel;
+      let buffer = '';
+
+      console.log('Starting to read stream...');
 
       if (reader) {
         try {
           while (true) {
             const { done, value } = await reader.read();
             
-            if (done) break;
+            if (done) {
+              console.log('Stream finished');
+              break;
+            }
             
             const chunk = decoder.decode(value, { stream: true });
+            console.log('Received chunk:', chunk);
+            buffer += chunk;
             
-            try {
-              const parsed = JSON.parse(chunk);
-              
-              if (parsed.type === 'reasoning') {
-                accumulatedReasoning += parsed.data;
-                setMessages(prev => 
-                  prev.map(msg => 
-                    msg.id === aiMessageId 
-                      ? { ...msg, reasoning: accumulatedReasoning }
-                      : msg
-                  )
-                );
-              } else if (parsed.type === 'content') {
-                if (isReasoningPhase) {
-                  isReasoningPhase = false;
+            // Process complete JSON objects
+            let lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep the incomplete line in buffer
+            
+            for (const line of lines) {
+              if (line.trim()) {
+                try {
+                  const parsed = JSON.parse(line);
+                  console.log('Parsed JSON:', parsed);
+                  
+                  if (parsed.type === 'reasoning') {
+                    accumulatedReasoning += parsed.data;
+                    console.log('Adding reasoning:', parsed.data);
+                    setMessages(prev => 
+                      prev.map(msg => 
+                        msg.id === aiMessageId 
+                          ? { ...msg, reasoning: accumulatedReasoning }
+                          : msg
+                      )
+                    );
+                  } else if (parsed.type === 'content') {
+                    if (isReasoningPhase) {
+                      isReasoningPhase = false;
+                      console.log('Reasoning phase complete');
+                      setMessages(prev => 
+                        prev.map(msg => 
+                          msg.id === aiMessageId 
+                            ? { ...msg, isReasoningComplete: true }
+                            : msg
+                        )
+                      );
+                    }
+                    accumulatedContent += parsed.data;
+                    console.log('Adding content:', parsed.data);
+                    setMessages(prev => 
+                      prev.map(msg => 
+                        msg.id === aiMessageId 
+                          ? { ...msg, content: accumulatedContent }
+                          : msg
+                      )
+                    );
+                  } else if (parsed.type === 'metadata') {
+                    console.log('Received metadata:', parsed.data);
+                    setMessages(prev => 
+                      prev.map(msg => 
+                        msg.id === aiMessageId 
+                          ? { ...msg, metadata: parsed.data }
+                          : msg
+                      )
+                    );
+                  }
+                } catch (e) {
+                  console.warn('Failed to parse JSON:', line, e);
+                  // If not JSON, treat as plain text content
+                  accumulatedContent += line;
                   setMessages(prev => 
                     prev.map(msg => 
                       msg.id === aiMessageId 
-                        ? { ...msg, isReasoningComplete: true }
+                        ? { ...msg, content: accumulatedContent }
                         : msg
                     )
                   );
                 }
-                accumulatedContent += parsed.data;
-                setMessages(prev => 
-                  prev.map(msg => 
-                    msg.id === aiMessageId 
-                      ? { ...msg, content: accumulatedContent }
-                      : msg
-                  )
-                );
-              } else if (parsed.type === 'metadata') {
-                setMessages(prev => 
-                  prev.map(msg => 
-                    msg.id === aiMessageId 
-                      ? { ...msg, metadata: parsed.data }
-                      : msg
-                  )
-                );
               }
-            } catch (e) {
-              // If not JSON, treat as plain text content
-              accumulatedContent += chunk;
-              setMessages(prev => 
-                prev.map(msg => 
-                  msg.id === aiMessageId 
-                    ? { ...msg, content: accumulatedContent }
-                    : msg
-                )
-              );
             }
           }
         } finally {
@@ -291,6 +258,7 @@ export const ChatPage: React.FC = () => {
         }
       }
 
+      console.log('Setting final message state');
       setMessages(prev => 
         prev.map(msg => 
           msg.id === aiMessageId 
@@ -373,141 +341,6 @@ export const ChatPage: React.FC = () => {
     });
   };
 
-  // Enhanced Markdown components with syntax highlighting and better styling
-  const markdownComponents = {
-    code: ({ node, inline, className, children, ...props }: any) => {
-      const match = /language-(\w+)/.exec(className || '');
-      const language = match ? match[1] : '';
-      
-      return !inline && language ? (
-        <div className="my-4 rounded-lg overflow-hidden border border-gray-200 shadow-sm">
-          <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">{language}</span>
-            <button 
-              onClick={() => navigator.clipboard.writeText(String(children))}
-              className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded bg-white hover:bg-gray-100 transition-colors"
-            >
-              Copy
-            </button>
-          </div>
-          <SyntaxHighlighter
-            style={oneDark}
-            language={language}
-            PreTag="div"
-            customStyle={{
-              margin: 0,
-              padding: '1rem',
-              fontSize: '0.875rem',
-              lineHeight: '1.5',
-            }}
-            {...props}
-          >
-            {String(children).replace(/\n$/, '')}
-          </SyntaxHighlighter>
-        </div>
-      ) : (
-        <code 
-          className="bg-purple-50 text-purple-800 px-2 py-1 rounded-md text-sm font-mono border border-purple-200" 
-          {...props}
-        >
-          {children}
-        </code>
-      );
-    },
-    
-    pre: ({ children }: any) => (
-      <div className="overflow-hidden rounded-lg my-4">
-        {children}
-      </div>
-    ),
-    
-    p: ({ children }: any) => (
-      <p className="mb-4 last:mb-0 leading-relaxed text-gray-800">{children}</p>
-    ),
-    
-    ul: ({ children }: any) => (
-      <ul className="list-none mb-4 space-y-2 pl-0">{children}</ul>
-    ),
-    
-    ol: ({ children }: any) => (
-      <ol className="list-decimal list-inside mb-4 space-y-2 pl-4 text-gray-800">{children}</ol>
-    ),
-    
-    li: ({ children }: any) => (
-      <li className="flex items-start">
-        <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-        <span className="text-gray-800">{children}</span>
-      </li>
-    ),
-    
-    strong: ({ children }: any) => (
-      <strong className="font-semibold text-gray-900">{children}</strong>
-    ),
-    
-    em: ({ children }: any) => (
-      <em className="italic text-gray-700">{children}</em>
-    ),
-    
-    h1: ({ children }: any) => (
-      <h1 className="text-2xl font-bold mb-4 text-gray-900 border-b border-gray-200 pb-2">{children}</h1>
-    ),
-    
-    h2: ({ children }: any) => (
-      <h2 className="text-xl font-semibold mb-3 text-gray-900 mt-6">{children}</h2>
-    ),
-    
-    h3: ({ children }: any) => (
-      <h3 className="text-lg font-medium mb-2 text-gray-900 mt-4">{children}</h3>
-    ),
-    
-    blockquote: ({ children }: any) => (
-      <blockquote className="border-l-4 border-blue-500 pl-4 py-2 my-4 bg-blue-50 rounded-r-lg">
-        <div className="text-gray-700 italic">{children}</div>
-      </blockquote>
-    ),
-    
-    table: ({ children }: any) => (
-      <div className="overflow-x-auto my-4">
-        <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
-          {children}
-        </table>
-      </div>
-    ),
-    
-    thead: ({ children }: any) => (
-      <thead className="bg-gray-50">{children}</thead>
-    ),
-    
-    tbody: ({ children }: any) => (
-      <tbody className="divide-y divide-gray-200">{children}</tbody>
-    ),
-    
-    tr: ({ children }: any) => (
-      <tr className="hover:bg-gray-50">{children}</tr>
-    ),
-    
-    th: ({ children }: any) => (
-      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-        {children}
-      </th>
-    ),
-    
-    td: ({ children }: any) => (
-      <td className="px-4 py-3 text-sm text-gray-900">{children}</td>
-    ),
-    
-    a: ({ children, href }: any) => (
-      <a 
-        href={href} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="text-blue-600 hover:text-blue-800 underline decoration-blue-300 hover:decoration-blue-500 transition-colors"
-      >
-        {children}
-      </a>
-    ),
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Header */}
@@ -531,35 +364,7 @@ export const ChatPage: React.FC = () => {
               </Button>
             </div>
             
-            {/* Model Selector */}
-            <div className="flex-1 max-w-md mx-8">
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger className="w-full bg-white border-gray-200 shadow-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {models.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex flex-col">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium">{model.name}</span>
-                            <Badge variant={model.badge === 'Free' ? 'default' : 'secondary'} className={
-                              model.badge === 'Free' 
-                                ? 'bg-green-100 text-green-700 hover:bg-green-100' 
-                                : 'bg-purple-100 text-purple-700 hover:bg-purple-100'
-                            }>
-                              {model.badge}
-                            </Badge>
-                          </div>
-                          <span className="text-xs text-gray-500">{model.description}</span>
-                        </div>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
 
             {/* User Profile Dropdown */}
             <div className="flex items-center space-x-4">
@@ -613,85 +418,11 @@ export const ChatPage: React.FC = () => {
               </div>
             ) : (
               messages.map((message) => (
-                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
-                    <div className={`rounded-2xl px-6 py-4 ${
-                      message.role === 'user' 
-                        ? 'bg-blue-600 text-white' 
-                        : 'bg-white shadow-lg border border-gray-100'
-                    }`}>
-                      {message.role === 'user' ? (
-                        <p className="text-sm whitespace-pre-wrap text-white leading-relaxed">
-                          {message.content}
-                        </p>
-                      ) : (
-                        <div className="prose prose-sm max-w-none">
-                          {/* Reasoning Section for Reasoning Models */}
-                          {message.reasoning !== undefined && (
-                            <Collapsible className="mb-4">
-                              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors">
-                                <div className="flex items-center space-x-2">
-                                  <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
-                                  <span className="text-sm font-medium text-amber-800">
-                                    {message.isReasoningComplete ? 'Reasoning Complete' : 'Thinking...'}
-                                  </span>
-                                </div>
-                                <ChevronDown className="h-4 w-4 text-amber-600 transition-transform duration-200" />
-                              </CollapsibleTrigger>
-                              <CollapsibleContent className="mt-2">
-                                <div className="p-4 bg-amber-25 border border-amber-100 rounded-lg">
-                                  <div className="text-sm text-amber-900 whitespace-pre-wrap font-mono">
-                                    {message.reasoning}
-                                    {!message.isReasoningComplete && (
-                                      <span className="inline-block w-2 h-4 bg-amber-500 animate-pulse ml-1 rounded-sm" />
-                                    )}
-                                  </div>
-                                </div>
-                              </CollapsibleContent>
-                            </Collapsible>
-                          )}
-                          
-                          {/* Main Content */}
-                          {message.isStreaming && !message.content ? (
-                            <div className="flex items-center space-x-2">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                              <span className="text-gray-600">Generating response...</span>
-                            </div>
-                          ) : (
-                            <>
-                              <ReactMarkdown 
-                                components={markdownComponents}
-                                remarkPlugins={[remarkGfm]}
-                              >
-                                {message.content}
-                              </ReactMarkdown>
-                              {message.isStreaming && (
-                                <span className="inline-block w-2 h-5 bg-blue-500 animate-pulse ml-1 rounded-sm" />
-                              )}
-                            </>
-                          )}
-                          
-                          {/* Metadata */}
-                          {message.metadata && (
-                            <div className="mt-4 p-2 bg-gray-50 rounded text-xs text-gray-600">
-                              Tokens: {message.metadata.prompt_tokens} + {message.metadata.completion_tokens} = {message.metadata.total_tokens}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <p className={`text-xs text-gray-500 mt-2 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                  <div className={`flex items-end ${message.role === 'user' ? 'order-1 mr-3' : 'order-2 ml-3'}`}>
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className={message.role === 'user' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}>
-                        {message.role === 'user' ? user?.username?.charAt(0).toUpperCase() : 'AI'}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                </div>
+                <ChatMessage 
+                  key={message.id} 
+                  message={message} 
+                  username={user?.username} 
+                />
               ))
             )}
             <div ref={messagesEndRef} />
@@ -700,79 +431,12 @@ export const ChatPage: React.FC = () => {
 
         {/* Input Area */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
-          {/* File Upload Area */}
-          {uploadedFiles.length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {uploadedFiles.map((file, index) => (
-                <div key={index} className="relative bg-gray-50 rounded-lg p-3 border border-gray-200 flex items-center space-x-2 max-w-xs">
-                  {file.type === 'image' && file.preview ? (
-                    <img src={file.preview} alt={file.file.name} className="w-8 h-8 object-cover rounded" />
-                  ) : (
-                    <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                      <FileText className="h-4 w-4 text-blue-600" />
-                    </div>
-                  )}
-                  <span className="text-sm text-gray-700 truncate flex-1">{file.file.name}</span>
-                  <button
-                    onClick={() => removeFile(index)}
-                    className="text-gray-400 hover:text-red-500 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          
           <div className="flex items-end space-x-3">
-            {/* Expandable Upload Button */}
-            <div className="relative">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsUploadExpanded(!isUploadExpanded)}
-                className="h-10 w-10 text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-                disabled={isLoading}
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
-              
-              {isUploadExpanded && (
-                <div className="absolute bottom-12 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-2 space-y-1 animate-fade-in">
-                  <button
-                    onClick={() => imageInputRef.current?.click()}
-                    className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
-                  >
-                    <Image className="h-4 w-4 text-blue-500" />
-                    <span>Upload Image</span>
-                  </button>
-                  <button
-                    onClick={() => documentInputRef.current?.click()}
-                    className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
-                  >
-                    <FileText className="h-4 w-4 text-green-500" />
-                    <span>Upload Document</span>
-                  </button>
-                </div>
-              )}
-            </div>
-            
-            <input
-              ref={imageInputRef}
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={(e) => handleFileUpload(e, 'image')}
-              className="hidden"
-            />
-            
-            <input
-              ref={documentInputRef}
-              type="file"
-              multiple
-              accept=".pdf,.doc,.docx,.txt"
-              onChange={(e) => handleFileUpload(e, 'document')}
-              className="hidden"
+            <FileUpload 
+              uploadedFiles={uploadedFiles}
+              setUploadedFiles={setUploadedFiles}
+              isLoading={isLoading}
+              onFileAdded={handleFileAdded}
             />
             
             <div className="flex-1">

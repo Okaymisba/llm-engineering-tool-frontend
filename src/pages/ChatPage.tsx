@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Settings, LogOut, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -184,22 +183,25 @@ export const ChatPage: React.FC = () => {
             }
             
             const chunk = decoder.decode(value, { stream: true });
-            console.log('Received chunk:', chunk);
+            console.log('Received raw chunk:', chunk);
             buffer += chunk;
             
-            // Process complete JSON objects
-            let lines = buffer.split('\n');
-            buffer = lines.pop() || ''; // Keep the incomplete line in buffer
+            // Split by newlines to get complete JSON objects
+            const lines = buffer.split('\n');
+            // Keep the last (potentially incomplete) line in the buffer
+            buffer = lines.pop() || '';
             
             for (const line of lines) {
-              if (line.trim()) {
+              const trimmedLine = line.trim();
+              if (trimmedLine) {
                 try {
-                  const parsed = JSON.parse(line);
-                  console.log('Parsed JSON:', parsed);
+                  console.log('Attempting to parse line:', trimmedLine);
+                  const parsed = JSON.parse(trimmedLine);
+                  console.log('Successfully parsed JSON:', parsed);
                   
                   if (parsed.type === 'reasoning') {
                     accumulatedReasoning += parsed.data;
-                    console.log('Adding reasoning:', parsed.data);
+                    console.log('Adding reasoning chunk:', parsed.data);
                     setMessages(prev => 
                       prev.map(msg => 
                         msg.id === aiMessageId 
@@ -210,7 +212,7 @@ export const ChatPage: React.FC = () => {
                   } else if (parsed.type === 'content') {
                     if (isReasoningPhase) {
                       isReasoningPhase = false;
-                      console.log('Reasoning phase complete');
+                      console.log('Reasoning phase complete, starting content');
                       setMessages(prev => 
                         prev.map(msg => 
                           msg.id === aiMessageId 
@@ -220,7 +222,7 @@ export const ChatPage: React.FC = () => {
                       );
                     }
                     accumulatedContent += parsed.data;
-                    console.log('Adding content:', parsed.data);
+                    console.log('Adding content chunk:', parsed.data);
                     setMessages(prev => 
                       prev.map(msg => 
                         msg.id === aiMessageId 
@@ -238,18 +240,49 @@ export const ChatPage: React.FC = () => {
                       )
                     );
                   }
-                } catch (e) {
-                  console.warn('Failed to parse JSON:', line, e);
-                  // If not JSON, treat as plain text content
-                  accumulatedContent += line;
-                  setMessages(prev => 
-                    prev.map(msg => 
-                      msg.id === aiMessageId 
-                        ? { ...msg, content: accumulatedContent }
-                        : msg
-                    )
-                  );
+                } catch (parseError) {
+                  console.warn('Failed to parse JSON line:', trimmedLine, 'Error:', parseError);
+                  // If it's not valid JSON, it might be plain text (fallback)
+                  if (trimmedLine.length > 0) {
+                    accumulatedContent += trimmedLine;
+                    setMessages(prev => 
+                      prev.map(msg => 
+                        msg.id === aiMessageId 
+                          ? { ...msg, content: accumulatedContent }
+                          : msg
+                      )
+                    );
+                  }
                 }
+              }
+            }
+          }
+          
+          // Process any remaining buffer content
+          if (buffer.trim()) {
+            try {
+              console.log('Processing final buffer:', buffer.trim());
+              const parsed = JSON.parse(buffer.trim());
+              if (parsed.type === 'metadata') {
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, metadata: parsed.data }
+                      : msg
+                  )
+                );
+              }
+            } catch (e) {
+              console.log('Final buffer not JSON, treating as content:', buffer.trim());
+              if (buffer.trim().length > 0) {
+                accumulatedContent += buffer.trim();
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, content: accumulatedContent }
+                      : msg
+                  )
+                );
               }
             }
           }

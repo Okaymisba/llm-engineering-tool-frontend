@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Settings, LogOut } from 'lucide-react';
+import { Send, Sparkles, Settings, LogOut, Paperclip, X, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 
 interface Message {
   id: string;
@@ -28,11 +29,19 @@ interface Message {
   isStreaming?: boolean;
 }
 
+interface UploadedFile {
+  file: File;
+  type: 'image' | 'document';
+  preview?: string;
+}
+
 const models = [
-  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', badge: 'Free & Fast', description: 'Fast responses, great for general tasks', provider: 'google' },
-  { id: 'gpt-4o', name: 'GPT-4o', badge: 'Premium', description: 'Most capable model for complex tasks', provider: 'openai' },
-  { id: 'claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', badge: 'Premium', description: 'Excellent for analysis and writing', provider: 'anthropic' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', badge: 'Fast', description: 'Balanced speed and capability', provider: 'openai' },
+  { id: 'gemini-2.0-flash', name: 'Google: Gemini 2.0 Flash', badge: 'Free', description: 'Fast responses, great for general tasks', provider: 'google' },
+  { id: 'Deepseek-r1-0528:free', name: 'Deepseek: R1 (Reasoning)', badge: 'Free', description: 'Advanced reasoning capabilities', provider: 'deepseek' },
+  { id: 'Deepseek-chat-v3-0324:free', name: 'Deepseek: V3', badge: 'Free', description: 'Powerful conversational AI', provider: 'deepseek' },
+  { id: 'gpt-4o', name: 'OpenAI: GPT-4o', badge: 'Paid', description: 'Most capable model for complex tasks', provider: 'openai' },
+  { id: 'claude-3.5-sonnet', name: 'Anthropic: Claude 3.5 Sonnet', badge: 'Paid', description: 'Excellent for analysis and writing', provider: 'anthropic' },
+  { id: 'gpt-4o-mini', name: 'OpenAI: GPT-4o Mini', badge: 'Paid', description: 'Balanced speed and capability', provider: 'openai' },
 ];
 
 export const ChatPage: React.FC = () => {
@@ -40,11 +49,13 @@ export const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const { user, token, logout } = useAuth();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Auto-scroll to bottom
@@ -66,8 +77,51 @@ export const ChatPage: React.FC = () => {
     }
   }, [messages, isLoading]);
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach((file) => {
+      const isImage = file.type.startsWith('image/');
+      const isDocument = file.type === 'application/pdf' || file.type.includes('document') || file.type.includes('text');
+      
+      if (isImage || isDocument) {
+        const uploadedFile: UploadedFile = {
+          file,
+          type: isImage ? 'image' : 'document'
+        };
+
+        if (isImage) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            uploadedFile.preview = e.target?.result as string;
+            setUploadedFiles(prev => [...prev, uploadedFile]);
+          };
+          reader.readAsDataURL(file);
+        } else {
+          setUploadedFiles(prev => [...prev, uploadedFile]);
+        }
+      } else {
+        toast({
+          title: "Unsupported file type",
+          description: "Please upload images or documents only.",
+          variant: "destructive",
+        });
+      }
+    });
+
+    // Clear the input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return;
+    if ((!inputValue.trim() && uploadedFiles.length === 0) || isLoading) return;
 
     if (!token) {
       toast({
@@ -87,7 +141,9 @@ export const ChatPage: React.FC = () => {
 
     setMessages(prev => [...prev, userMessage]);
     const currentInput = inputValue;
+    const currentFiles = [...uploadedFiles];
     setInputValue('');
+    setUploadedFiles([]);
     setIsLoading(true);
 
     // Create AI message placeholder
@@ -109,7 +165,8 @@ export const ChatPage: React.FC = () => {
         session_id: sessionId,
         question: currentInput,
         provider: selectedModelData?.provider,
-        model: selectedModel
+        model: selectedModel,
+        files: currentFiles.map(f => ({ name: f.file.name, type: f.type }))
       });
 
       const formData = new FormData();
@@ -119,6 +176,15 @@ export const ChatPage: React.FC = () => {
       formData.append('model', selectedModel);
       formData.append('our_image_processing_algo', 'false');
       formData.append('document_semantic_search', 'false');
+
+      // Add uploaded files
+      currentFiles.forEach((uploadedFile) => {
+        if (uploadedFile.type === 'image') {
+          formData.append('upload_image', uploadedFile.file);
+        } else {
+          formData.append('upload_document', uploadedFile.file);
+        }
+      });
 
       console.log('Making streaming request to /chat endpoint...');
 
@@ -249,6 +315,13 @@ export const ChatPage: React.FC = () => {
     toast({
       title: "Settings",
       description: "Settings page coming soon!",
+    });
+  };
+
+  const handleChatHistory = () => {
+    toast({
+      title: "Chat History",
+      description: "Chat history feature coming soon!",
     });
   };
 
@@ -393,9 +466,21 @@ export const ChatPage: React.FC = () => {
       <header className="border-b bg-white/90 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2 cursor-default">
-              <Sparkles className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">AIHub</span>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 cursor-default">
+                <Sparkles className="h-8 w-8 text-blue-600" />
+                <span className="text-2xl font-bold text-gray-900">Syncmind</span>
+              </div>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleChatHistory}
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+              >
+                <History className="h-4 w-4" />
+                <span>Chat History</span>
+              </Button>
             </div>
             
             {/* Model Selector */}
@@ -404,22 +489,20 @@ export const ChatPage: React.FC = () => {
                 <SelectTrigger className="w-full bg-white border-gray-200 shadow-sm">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-60">
                   {models.map((model) => (
                     <SelectItem key={model.id} value={model.id}>
                       <div className="flex items-center justify-between w-full">
                         <div className="flex flex-col">
                           <div className="flex items-center space-x-2">
                             <span className="font-medium">{model.name}</span>
-                            <span className={`px-2 py-0.5 text-xs rounded-full ${
-                              model.badge === 'Free & Fast' 
-                                ? 'bg-green-100 text-green-700' 
-                                : model.badge === 'Fast'
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-purple-100 text-purple-700'
-                            }`}>
+                            <Badge variant={model.badge === 'Free' ? 'default' : 'secondary'} className={
+                              model.badge === 'Free' 
+                                ? 'bg-green-100 text-green-700 hover:bg-green-100' 
+                                : 'bg-purple-100 text-purple-700 hover:bg-purple-100'
+                            }>
                               {model.badge}
-                            </span>
+                            </Badge>
                           </div>
                           <span className="text-xs text-gray-500">{model.description}</span>
                         </div>
@@ -536,7 +619,50 @@ export const ChatPage: React.FC = () => {
 
         {/* Input Area */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
+          {/* File Upload Area */}
+          {uploadedFiles.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {uploadedFiles.map((file, index) => (
+                <div key={index} className="relative bg-gray-50 rounded-lg p-3 border border-gray-200 flex items-center space-x-2 max-w-xs">
+                  {file.type === 'image' && file.preview ? (
+                    <img src={file.preview} alt={file.file.name} className="w-8 h-8 object-cover rounded" />
+                  ) : (
+                    <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+                      <Paperclip className="h-4 w-4 text-blue-600" />
+                    </div>
+                  )}
+                  <span className="text-sm text-gray-700 truncate flex-1">{file.file.name}</span>
+                  <button
+                    onClick={() => removeFile(index)}
+                    className="text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
           <div className="flex items-end space-x-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              className="h-10 w-10 text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+              disabled={isLoading}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.doc,.docx,.txt"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            
             <div className="flex-1">
               <Input
                 ref={inputRef}
@@ -550,7 +676,7 @@ export const ChatPage: React.FC = () => {
             </div>
             <Button
               onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
+              disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading}
               size="icon"
               className="h-10 w-10 bg-blue-600 hover:bg-blue-700 rounded-xl"
             >

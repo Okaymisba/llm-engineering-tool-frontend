@@ -155,7 +155,6 @@ export const ChatPage: React.FC = () => {
       });
 
       console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -186,105 +185,98 @@ export const ChatPage: React.FC = () => {
             console.log('Received raw chunk:', chunk);
             buffer += chunk;
             
-            // Split by newlines to get complete JSON objects
-            const lines = buffer.split('\n');
-            // Keep the last (potentially incomplete) line in the buffer
-            buffer = lines.pop() || '';
+            // Try to parse complete JSON objects from the buffer
+            let startIndex = 0;
+            let braceCount = 0;
+            let inString = false;
+            let escaped = false;
             
-            for (const line of lines) {
-              const trimmedLine = line.trim();
-              if (trimmedLine) {
-                try {
-                  console.log('Attempting to parse line:', trimmedLine);
-                  const parsed = JSON.parse(trimmedLine);
-                  console.log('Successfully parsed JSON:', parsed);
-                  
-                  if (parsed.type === 'reasoning') {
-                    accumulatedReasoning += parsed.data;
-                    console.log('Adding reasoning chunk:', parsed.data);
-                    setMessages(prev => 
-                      prev.map(msg => 
-                        msg.id === aiMessageId 
-                          ? { ...msg, reasoning: accumulatedReasoning }
-                          : msg
-                      )
-                    );
-                  } else if (parsed.type === 'content') {
-                    if (isReasoningPhase) {
-                      isReasoningPhase = false;
-                      console.log('Reasoning phase complete, starting content');
+            for (let i = 0; i < buffer.length; i++) {
+              const char = buffer[i];
+              
+              if (escaped) {
+                escaped = false;
+                continue;
+              }
+              
+              if (char === '\\') {
+                escaped = true;
+                continue;
+              }
+              
+              if (char === '"') {
+                inString = !inString;
+                continue;
+              }
+              
+              if (inString) continue;
+              
+              if (char === '{') {
+                braceCount++;
+              } else if (char === '}') {
+                braceCount--;
+                
+                if (braceCount === 0) {
+                  // Found complete JSON object
+                  const jsonStr = buffer.substring(startIndex, i + 1);
+                  try {
+                    console.log('Attempting to parse JSON:', jsonStr);
+                    const parsed = JSON.parse(jsonStr);
+                    console.log('Successfully parsed JSON:', parsed);
+                    
+                    if (parsed.type === 'reasoning') {
+                      accumulatedReasoning += parsed.data;
+                      console.log('Adding reasoning chunk:', parsed.data);
                       setMessages(prev => 
                         prev.map(msg => 
                           msg.id === aiMessageId 
-                            ? { ...msg, isReasoningComplete: true }
+                            ? { ...msg, reasoning: accumulatedReasoning }
+                            : msg
+                        )
+                      );
+                    } else if (parsed.type === 'content') {
+                      if (isReasoningPhase) {
+                        isReasoningPhase = false;
+                        console.log('Reasoning phase complete, starting content');
+                        setMessages(prev => 
+                          prev.map(msg => 
+                            msg.id === aiMessageId 
+                              ? { ...msg, isReasoningComplete: true }
+                              : msg
+                          )
+                        );
+                      }
+                      accumulatedContent += parsed.data;
+                      console.log('Adding content chunk:', parsed.data);
+                      setMessages(prev => 
+                        prev.map(msg => 
+                          msg.id === aiMessageId 
+                            ? { ...msg, content: accumulatedContent }
+                            : msg
+                        )
+                      );
+                    } else if (parsed.type === 'metadata') {
+                      console.log('Received metadata:', parsed.data);
+                      setMessages(prev => 
+                        prev.map(msg => 
+                          msg.id === aiMessageId 
+                            ? { ...msg, metadata: parsed.data }
                             : msg
                         )
                       );
                     }
-                    accumulatedContent += parsed.data;
-                    console.log('Adding content chunk:', parsed.data);
-                    setMessages(prev => 
-                      prev.map(msg => 
-                        msg.id === aiMessageId 
-                          ? { ...msg, content: accumulatedContent }
-                          : msg
-                      )
-                    );
-                  } else if (parsed.type === 'metadata') {
-                    console.log('Received metadata:', parsed.data);
-                    setMessages(prev => 
-                      prev.map(msg => 
-                        msg.id === aiMessageId 
-                          ? { ...msg, metadata: parsed.data }
-                          : msg
-                      )
-                    );
+                  } catch (parseError) {
+                    console.warn('Failed to parse JSON:', jsonStr, 'Error:', parseError);
                   }
-                } catch (parseError) {
-                  console.warn('Failed to parse JSON line:', trimmedLine, 'Error:', parseError);
-                  // If it's not valid JSON, it might be plain text (fallback)
-                  if (trimmedLine.length > 0) {
-                    accumulatedContent += trimmedLine;
-                    setMessages(prev => 
-                      prev.map(msg => 
-                        msg.id === aiMessageId 
-                          ? { ...msg, content: accumulatedContent }
-                          : msg
-                      )
-                    );
-                  }
+                  
+                  // Move to next potential JSON object
+                  startIndex = i + 1;
                 }
               }
             }
-          }
-          
-          // Process any remaining buffer content
-          if (buffer.trim()) {
-            try {
-              console.log('Processing final buffer:', buffer.trim());
-              const parsed = JSON.parse(buffer.trim());
-              if (parsed.type === 'metadata') {
-                setMessages(prev => 
-                  prev.map(msg => 
-                    msg.id === aiMessageId 
-                      ? { ...msg, metadata: parsed.data }
-                      : msg
-                  )
-                );
-              }
-            } catch (e) {
-              console.log('Final buffer not JSON, treating as content:', buffer.trim());
-              if (buffer.trim().length > 0) {
-                accumulatedContent += buffer.trim();
-                setMessages(prev => 
-                  prev.map(msg => 
-                    msg.id === aiMessageId 
-                      ? { ...msg, content: accumulatedContent }
-                      : msg
-                  )
-                );
-              }
-            }
+            
+            // Keep remaining incomplete JSON in buffer
+            buffer = buffer.substring(startIndex);
           }
         } finally {
           reader.releaseLock();

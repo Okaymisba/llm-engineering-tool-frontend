@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Settings, LogOut, History } from 'lucide-react';
+import { Send, Sparkles, Settings, LogOut, History, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +41,59 @@ interface UploadedFile {
   preview?: string;
 }
 
+// Helper function to parse JSON objects from stream
+const parseJSONFromBuffer = (buffer: string): { parsed: any[], remaining: string } => {
+  const parsed: any[] = [];
+  let remaining = buffer;
+  let depth = 0;
+  let start = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < remaining.length; i++) {
+    const char = remaining[i];
+    
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    
+    if (inString) continue;
+    
+    if (char === '{') {
+      depth++;
+    } else if (char === '}') {
+      depth--;
+      
+      if (depth === 0) {
+        const jsonStr = remaining.substring(start, i + 1);
+        try {
+          const obj = JSON.parse(jsonStr);
+          parsed.push(obj);
+        } catch (e) {
+          console.warn('Failed to parse JSON object:', jsonStr);
+        }
+        start = i + 1;
+      }
+    }
+  }
+  
+  return {
+    parsed,
+    remaining: remaining.substring(start)
+  };
+};
+
 export const ChatPage: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -48,6 +103,7 @@ export const ChatPage: React.FC = () => {
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const { user, token, logout } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -68,6 +124,50 @@ export const ChatPage: React.FC = () => {
       }, 100);
     }
   }, [messages, isLoading]);
+
+  // Cleanup on unmount or page reload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const handleCancelRequest = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsLoading(false);
+      
+      // Update the last message to show it was cancelled
+      setMessages(prev => 
+        prev.map((msg, index) => 
+          index === prev.length - 1 && msg.role === 'assistant' && msg.isStreaming
+            ? { 
+                ...msg, 
+                content: msg.content + '\n\n*Response was cancelled*',
+                isStreaming: false,
+                isReasoningComplete: true
+              }
+            : msg
+        )
+      );
+
+      toast({
+        title: "Request Cancelled",
+        description: "The response generation has been stopped.",
+      });
+    }
+  };
 
   const handleFileAdded = (newFiles: UploadedFile[]) => {
     setUploadedFiles(prev => [...prev, ...newFiles]);
@@ -116,14 +216,6 @@ export const ChatPage: React.FC = () => {
     setMessages(prev => [...prev, aiMessage]);
 
     try {
-      console.log('Sending chat request with:', {
-        session_id: sessionId,
-        question: currentInput,
-        provider: selectedModelData?.provider,
-        model: selectedModel,
-        files: currentFiles.map(f => ({ name: f.file.name, type: f.type }))
-      });
-
       const formData = new FormData();
       formData.append('session_id', sessionId);
       formData.append('question', currentInput);
@@ -140,8 +232,6 @@ export const ChatPage: React.FC = () => {
         }
       });
 
-      console.log('Making streaming request to /chat endpoint...');
-
       const API_BASE_URL = 'http://localhost:8000';
       abortControllerRef.current = new AbortController();
 
@@ -154,11 +244,8 @@ export const ChatPage: React.FC = () => {
         signal: abortControllerRef.current.signal,
       });
 
-      console.log('Response status:', response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('HTTP error response:', errorText);
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
@@ -169,121 +256,64 @@ export const ChatPage: React.FC = () => {
       let isReasoningPhase = isReasoningModel;
       let buffer = '';
 
-      console.log('Starting to read stream...');
-
       if (reader) {
         try {
           while (true) {
             const { done, value } = await reader.read();
             
-            if (done) {
-              console.log('Stream finished');
-              break;
-            }
+            if (done) break;
             
             const chunk = decoder.decode(value, { stream: true });
-            console.log('Received raw chunk:', chunk);
             buffer += chunk;
             
-            // Try to parse complete JSON objects from the buffer
-            let startIndex = 0;
-            let braceCount = 0;
-            let inString = false;
-            let escaped = false;
+            const { parsed, remaining } = parseJSONFromBuffer(buffer);
+            buffer = remaining;
             
-            for (let i = 0; i < buffer.length; i++) {
-              const char = buffer[i];
-              
-              if (escaped) {
-                escaped = false;
-                continue;
-              }
-              
-              if (char === '\\') {
-                escaped = true;
-                continue;
-              }
-              
-              if (char === '"') {
-                inString = !inString;
-                continue;
-              }
-              
-              if (inString) continue;
-              
-              if (char === '{') {
-                braceCount++;
-              } else if (char === '}') {
-                braceCount--;
-                
-                if (braceCount === 0) {
-                  // Found complete JSON object
-                  const jsonStr = buffer.substring(startIndex, i + 1);
-                  try {
-                    console.log('Attempting to parse JSON:', jsonStr);
-                    const parsed = JSON.parse(jsonStr);
-                    console.log('Successfully parsed JSON:', parsed);
-                    
-                    if (parsed.type === 'reasoning') {
-                      accumulatedReasoning += parsed.data;
-                      console.log('Adding reasoning chunk:', parsed.data);
-                      setMessages(prev => 
-                        prev.map(msg => 
-                          msg.id === aiMessageId 
-                            ? { ...msg, reasoning: accumulatedReasoning }
-                            : msg
-                        )
-                      );
-                    } else if (parsed.type === 'content') {
-                      if (isReasoningPhase) {
-                        isReasoningPhase = false;
-                        console.log('Reasoning phase complete, starting content');
-                        setMessages(prev => 
-                          prev.map(msg => 
-                            msg.id === aiMessageId 
-                              ? { ...msg, isReasoningComplete: true }
-                              : msg
-                          )
-                        );
-                      }
-                      accumulatedContent += parsed.data;
-                      console.log('Adding content chunk:', parsed.data);
-                      setMessages(prev => 
-                        prev.map(msg => 
-                          msg.id === aiMessageId 
-                            ? { ...msg, content: accumulatedContent }
-                            : msg
-                        )
-                      );
-                    } else if (parsed.type === 'metadata') {
-                      console.log('Received metadata:', parsed.data);
-                      setMessages(prev => 
-                        prev.map(msg => 
-                          msg.id === aiMessageId 
-                            ? { ...msg, metadata: parsed.data }
-                            : msg
-                        )
-                      );
-                    }
-                  } catch (parseError) {
-                    console.warn('Failed to parse JSON:', jsonStr, 'Error:', parseError);
-                  }
-                  
-                  // Move to next potential JSON object
-                  startIndex = i + 1;
+            for (const parsedChunk of parsed) {
+              if (parsedChunk.type === 'reasoning') {
+                accumulatedReasoning += parsedChunk.data;
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, reasoning: accumulatedReasoning }
+                      : msg
+                  )
+                );
+              } else if (parsedChunk.type === 'content') {
+                if (isReasoningPhase) {
+                  isReasoningPhase = false;
+                  setMessages(prev => 
+                    prev.map(msg => 
+                      msg.id === aiMessageId 
+                        ? { ...msg, isReasoningComplete: true }
+                        : msg
+                    )
+                  );
                 }
+                accumulatedContent += parsedChunk.data;
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, content: accumulatedContent }
+                      : msg
+                  )
+                );
+              } else if (parsedChunk.type === 'metadata') {
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, metadata: parsedChunk.data }
+                      : msg
+                  )
+                );
               }
             }
-            
-            // Keep remaining incomplete JSON in buffer
-            buffer = buffer.substring(startIndex);
           }
         } finally {
           reader.releaseLock();
         }
       }
 
-      console.log('Setting final message state');
       setMessages(prev => 
         prev.map(msg => 
           msg.id === aiMessageId 
@@ -367,38 +397,50 @@ export const ChatPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">
       {/* Header */}
-      <header className="border-b bg-white/90 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 cursor-default">
-                <Sparkles className="h-8 w-8 text-blue-600" />
-                <span className="text-2xl font-bold text-gray-900">Syncmind</span>
+      <header className="border-b bg-white/90 backdrop-blur-sm sticky top-0 z-10 shrink-0">
+        <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              <div className="flex items-center gap-1 sm:gap-2 cursor-default">
+                <Sparkles className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 shrink-0" />
+                <span className="text-lg sm:text-2xl font-bold text-gray-900 truncate">Syncmind</span>
               </div>
               
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleChatHistory}
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
-              >
-                <History className="h-4 w-4" />
-                <span>Chat History</span>
-              </Button>
+              {!isMobile && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleChatHistory}
+                  className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 shrink-0"
+                >
+                  <History className="h-4 w-4" />
+                  <span className="hidden sm:inline">Chat History</span>
+                </Button>
+              )}
             </div>
             
-            <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              <div className="hidden sm:block">
+                <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+              </div>
+              
+              {/* Mobile Model Selector */}
+              {isMobile && (
+                <div className="max-w-[120px]">
+                  <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+                </div>
+              )}
 
-            {/* User Profile Dropdown */}
-            <div className="flex items-center space-x-4">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <div className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 rounded-lg px-3 py-2 transition-colors">
-                    <span className="text-sm text-gray-600">Welcome, {user?.username}</span>
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-blue-100 text-blue-600">
+                  <div className="flex items-center gap-1 sm:gap-3 cursor-pointer hover:bg-gray-50 rounded-lg px-2 sm:px-3 py-2 transition-colors min-w-0">
+                    {!isMobile && (
+                      <span className="text-xs sm:text-sm text-gray-600 truncate">Welcome, {user?.username}</span>
+                    )}
+                    <Avatar className="h-6 w-6 sm:h-8 sm:w-8 shrink-0">
+                      <AvatarFallback className="bg-blue-100 text-blue-600 text-xs sm:text-sm">
                         {user?.username?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -410,6 +452,15 @@ export const ChatPage: React.FC = () => {
                     <p className="text-xs text-gray-500">{user?.email}</p>
                   </div>
                   <DropdownMenuSeparator />
+                  {isMobile && (
+                    <>
+                      <DropdownMenuItem onClick={handleChatHistory} className="cursor-pointer">
+                        <History className="mr-2 h-4 w-4" />
+                        <span>Chat History</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuItem onClick={handleSettings} className="cursor-pointer">
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
@@ -426,17 +477,17 @@ export const ChatPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Chat Interface */}
-      <div className="container mx-auto max-w-4xl px-4 py-8 h-[calc(100vh-120px)] flex flex-col">
+      {/* Main Chat Container */}
+      <div className="flex-1 w-full max-w-5xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8 flex flex-col min-h-0">
         {/* Messages Area */}
-        <ScrollArea className="flex-1 mb-6">
-          <div className="space-y-6 pr-4">
+        <ScrollArea className="flex-1 mb-4 sm:mb-6">
+          <div className="space-y-4 sm:space-y-6 pr-2 sm:pr-4">
             {messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full min-h-[400px]">
-                <Card className="p-8 text-center bg-white/80 backdrop-blur-sm border-0 shadow-xl max-w-md">
-                  <Sparkles className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Start a conversation</h3>
-                  <p className="text-gray-600">
+              <div className="flex items-center justify-center h-full min-h-[300px] sm:min-h-[400px]">
+                <Card className="p-6 sm:p-8 text-center bg-white/80 backdrop-blur-sm border-0 shadow-xl max-w-md mx-auto">
+                  <Sparkles className="h-10 w-10 sm:h-12 sm:w-12 text-blue-600 mx-auto mb-3 sm:mb-4" />
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Start a conversation</h3>
+                  <p className="text-sm sm:text-base text-gray-600">
                     Ask me anything! I'm powered by {models.find(m => m.id === selectedModel)?.name}.
                   </p>
                 </Card>
@@ -454,9 +505,24 @@ export const ChatPage: React.FC = () => {
           </div>
         </ScrollArea>
 
+        {/* Cancel Button (shown during streaming) */}
+        {isLoading && (
+          <div className="flex justify-center mb-4">
+            <Button
+              onClick={handleCancelRequest}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+            >
+              <X className="h-4 w-4" />
+              Cancel Response
+            </Button>
+          </div>
+        )}
+
         {/* Input Area */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
-          <div className="flex items-end space-x-3">
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100 p-3 sm:p-4 shrink-0">
+          <div className="flex items-end gap-2 sm:gap-3">
             <FileUpload 
               uploadedFiles={uploadedFiles}
               setUploadedFiles={setUploadedFiles}
@@ -464,14 +530,14 @@ export const ChatPage: React.FC = () => {
               onFileAdded={handleFileAdded}
             />
             
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <Input
                 ref={inputRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
-                className="border-0 focus-visible:ring-0 text-base resize-none bg-transparent"
+                className="border-0 focus-visible:ring-0 text-sm sm:text-base resize-none bg-transparent"
                 disabled={isLoading}
               />
             </div>
@@ -479,9 +545,9 @@ export const ChatPage: React.FC = () => {
               onClick={handleSendMessage}
               disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading}
               size="icon"
-              className="h-10 w-10 bg-blue-600 hover:bg-blue-700 rounded-xl"
+              className="h-8 w-8 sm:h-10 sm:w-10 bg-blue-600 hover:bg-blue-700 rounded-lg sm:rounded-xl shrink-0"
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </div>
         </div>

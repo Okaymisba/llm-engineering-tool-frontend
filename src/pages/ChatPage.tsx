@@ -1,10 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Settings, LogOut, History, X } from 'lucide-react';
+import { Send, Sparkles, Settings, LogOut, History, X, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
@@ -42,7 +39,7 @@ interface UploadedFile {
 }
 
 // Helper function to parse JSON objects from stream
-const parseJSONFromBuffer = (buffer: string): { parsed: any[], remaining: string } => {
+const parseJSONStream = (buffer: string): { parsed: any[], remaining: string } => {
   const parsed: any[] = [];
   let remaining = buffer;
   let depth = 0;
@@ -101,19 +98,37 @@ export const ChatPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [isUserScrolled, setIsUserScrolled] = useState(false);
+  
   const { user, token, logout } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+    setShowScrollToBottom(false);
+    setIsUserScrolled(false);
+  };
+
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    
+    setShowScrollToBottom(!isNearBottom);
+    setIsUserScrolled(scrollTop > 0 && !isNearBottom);
   };
 
   useEffect(() => {
-    scrollToBottom();
+    if (!isUserScrolled) {
+      scrollToBottom();
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -198,6 +213,7 @@ export const ChatPage: React.FC = () => {
     setInputValue('');
     setUploadedFiles([]);
     setIsLoading(true);
+    setIsUserScrolled(false);
 
     const aiMessageId = (Date.now() + 1).toString();
     const selectedModelData = models.find(m => m.id === selectedModel);
@@ -266,7 +282,7 @@ export const ChatPage: React.FC = () => {
             const chunk = decoder.decode(value, { stream: true });
             buffer += chunk;
             
-            const { parsed, remaining } = parseJSONFromBuffer(buffer);
+            const { parsed, remaining } = parseJSONStream(buffer);
             buffer = remaining;
             
             for (const parsedChunk of parsed) {
@@ -397,15 +413,15 @@ export const ChatPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">
+    <div className="min-h-screen w-full bg-gray-50 flex flex-col font-sans">
       {/* Header */}
-      <header className="border-b bg-white/90 backdrop-blur-sm sticky top-0 z-10 shrink-0">
-        <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-2 sm:gap-4">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-              <div className="flex items-center gap-1 sm:gap-2 cursor-default">
-                <Sparkles className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 shrink-0" />
-                <span className="text-lg sm:text-2xl font-bold text-gray-900 truncate">Syncmind</span>
+      <header className="border-b bg-white/90 backdrop-blur-sm sticky top-0 z-20 shrink-0">
+        <div className="w-full max-w-4xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-6 w-6 text-green-600" />
+                <span className="text-xl font-semibold text-gray-900">Syncmind</span>
               </div>
               
               {!isMobile && (
@@ -413,40 +429,31 @@ export const ChatPage: React.FC = () => {
                   variant="ghost"
                   size="sm"
                   onClick={handleChatHistory}
-                  className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 shrink-0"
+                  className="text-gray-600 hover:text-gray-900"
                 >
-                  <History className="h-4 w-4" />
-                  <span className="hidden sm:inline">Chat History</span>
+                  <History className="h-4 w-4 mr-2" />
+                  History
                 </Button>
               )}
             </div>
             
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-              <div className="hidden sm:block">
-                <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
-              </div>
-              
-              {/* Mobile Model Selector */}
-              {isMobile && (
-                <div className="max-w-[120px]">
-                  <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
-                </div>
-              )}
+            <div className="flex items-center gap-3">
+              <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <div className="flex items-center gap-1 sm:gap-3 cursor-pointer hover:bg-gray-50 rounded-lg px-2 sm:px-3 py-2 transition-colors min-w-0">
+                  <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors">
                     {!isMobile && (
-                      <span className="text-xs sm:text-sm text-gray-600 truncate">Welcome, {user?.username}</span>
+                      <span className="text-sm text-gray-600">{user?.username}</span>
                     )}
-                    <Avatar className="h-6 w-6 sm:h-8 sm:w-8 shrink-0">
-                      <AvatarFallback className="bg-blue-100 text-blue-600 text-xs sm:text-sm">
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback className="bg-green-100 text-green-600 text-sm">
                         {user?.username?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                   </div>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-white border border-gray-200 shadow-lg">
+                <DropdownMenuContent align="end" className="w-56 bg-white border shadow-lg">
                   <div className="px-3 py-2">
                     <p className="text-sm font-medium text-gray-900">{user?.username}</p>
                     <p className="text-xs text-gray-500">{user?.email}</p>
@@ -454,21 +461,21 @@ export const ChatPage: React.FC = () => {
                   <DropdownMenuSeparator />
                   {isMobile && (
                     <>
-                      <DropdownMenuItem onClick={handleChatHistory} className="cursor-pointer">
+                      <DropdownMenuItem onClick={handleChatHistory}>
                         <History className="mr-2 h-4 w-4" />
-                        <span>Chat History</span>
+                        History
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </>
                   )}
-                  <DropdownMenuItem onClick={handleSettings} className="cursor-pointer">
+                  <DropdownMenuItem onClick={handleSettings}>
                     <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
+                    Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 hover:text-red-700 hover:bg-red-50">
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 hover:text-red-700 hover:bg-red-50">
                     <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                    Log out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -477,78 +484,106 @@ export const ChatPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Chat Container */}
-      <div className="flex-1 w-full max-w-5xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8 flex flex-col min-h-0">
+      {/* Chat Container */}
+      <div className="flex-1 w-full max-w-4xl mx-auto px-4 flex flex-col relative">
         {/* Messages Area */}
-        <ScrollArea className="flex-1 mb-4 sm:mb-6">
-          <div className="space-y-4 sm:space-y-6 pr-2 sm:pr-4">
-            {messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full min-h-[300px] sm:min-h-[400px]">
-                <Card className="p-6 sm:p-8 text-center bg-white/80 backdrop-blur-sm border-0 shadow-xl max-w-md mx-auto">
-                  <Sparkles className="h-10 w-10 sm:h-12 sm:w-12 text-blue-600 mx-auto mb-3 sm:mb-4" />
-                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Start a conversation</h3>
-                  <p className="text-sm sm:text-base text-gray-600">
-                    Ask me anything! I'm powered by {models.find(m => m.id === selectedModel)?.name}.
-                  </p>
-                </Card>
+        <div 
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto py-6 space-y-4"
+          style={{ minHeight: 0 }}
+        >
+          {messages.length === 0 ? (
+            <div className="flex items-center justify-center h-full min-h-[400px]">
+              <div className="text-center max-w-md">
+                <Sparkles className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">How can I help you today?</h3>
+                <p className="text-gray-600">
+                  Start a conversation with {models.find(m => m.id === selectedModel)?.name}.
+                </p>
               </div>
-            ) : (
-              messages.map((message) => (
-                <ChatMessage 
-                  key={message.id} 
-                  message={message} 
-                  username={user?.username} 
-                />
-              ))
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
+            </div>
+          ) : (
+            messages.map((message) => (
+              <ChatMessage 
+                key={message.id} 
+                message={message} 
+                username={user?.username} 
+              />
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
 
-        {/* Cancel Button (shown during streaming) */}
+        {/* Scroll to Bottom Button */}
+        {showScrollToBottom && (
+          <Button
+            onClick={() => scrollToBottom()}
+            className="fixed bottom-24 right-8 h-10 w-10 rounded-full bg-white border shadow-lg hover:shadow-xl z-10"
+            size="icon"
+            variant="outline"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </Button>
+        )}
+
+        {/* Cancel Button during streaming */}
         {isLoading && (
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center py-4">
             <Button
               onClick={handleCancelRequest}
               variant="outline"
               size="sm"
-              className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+              className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
             >
               <X className="h-4 w-4" />
-              Cancel Response
+              Stop generating
             </Button>
           </div>
         )}
 
         {/* Input Area */}
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100 p-3 sm:p-4 shrink-0">
-          <div className="flex items-end gap-2 sm:gap-3">
-            <FileUpload 
-              uploadedFiles={uploadedFiles}
-              setUploadedFiles={setUploadedFiles}
-              isLoading={isLoading}
-              onFileAdded={handleFileAdded}
-            />
-            
-            <div className="flex-1 min-w-0">
-              <Input
-                ref={inputRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
-                className="border-0 focus-visible:ring-0 text-sm sm:text-base resize-none bg-transparent"
-                disabled={isLoading}
+        <div className="py-4 sticky bottom-0 bg-gray-50">
+          <div className="bg-white rounded-xl border shadow-sm p-3">
+            <div className="flex items-end gap-3">
+              <FileUpload 
+                uploadedFiles={uploadedFiles}
+                setUploadedFiles={setUploadedFiles}
+                isLoading={isLoading}
+                onFileAdded={handleFileAdded}
               />
+              
+              <div className="flex-1 min-w-0 relative">
+                <Textarea
+                  ref={inputRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  placeholder="Message Syncmind..."
+                  className="min-h-[24px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base"
+                  disabled={isLoading}
+                  rows={1}
+                  style={{ 
+                    height: 'auto',
+                    lineHeight: '1.5'
+                  }}
+                  onInput={(e) => {
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+                  }}
+                />
+              </div>
+              
+              <Button
+                onClick={handleSendMessage}
+                disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading}
+                size="icon"
+                className="h-8 w-8 bg-gray-900 hover:bg-gray-800 rounded-lg shrink-0"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              onClick={handleSendMessage}
-              disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading}
-              size="icon"
-              className="h-8 w-8 sm:h-10 sm:w-10 bg-blue-600 hover:bg-blue-700 rounded-lg sm:rounded-xl shrink-0"
-            >
-              <Send className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
           </div>
         </div>
       </div>

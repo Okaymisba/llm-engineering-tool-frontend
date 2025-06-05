@@ -11,6 +11,7 @@ import { AuthPage } from "@/pages/AuthPage";
 import { Dashboard } from "@/pages/Dashboard";
 import { LandingPage } from "@/pages/LandingPage";
 import { ChatPage } from "@/pages/ChatPage";
+import { ApiKeysPage } from "@/pages/ApiKeysPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/api-keys" 
+                element={
+                  <ProtectedRoute>
+                    <ApiKeysPage />
                   </ProtectedRoute>
                 } 
               />

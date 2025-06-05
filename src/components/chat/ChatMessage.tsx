@@ -172,7 +172,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, username }) =
               {message.content}
             </p>
           ) : (
-            <div className="prose prose-sm max-w-none">
+            <div className="prose prose-sm max-w-none text-gray-800">
               {/* Reasoning Section */}
               {message.reasoning !== undefined && (
                 <Collapsible className="mb-4">
@@ -213,7 +213,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, username }) =
                   <ReactMarkdown 
                     components={markdownComponents}
                     remarkPlugins={[remarkGfm]}
-                    className="text-gray-800"
                   >
                     {message.content}
                   </ReactMarkdown>

@@ -16,11 +16,18 @@ interface Message {
   timestamp: Date;
 }
 
+interface UploadedFile {
+  file: File;
+  type: 'image' | 'document';
+  preview?: string;
+}
+
 export const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -30,6 +37,10 @@ export const ChatPage: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const handleFileAdded = (newFiles: UploadedFile[]) => {
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+  };
 
   const handleSend = async () => {
     if (!input.trim() || !selectedModel) return;
@@ -126,7 +137,12 @@ export const ChatPage: React.FC = () => {
 
           {/* Input Area */}
           <div className="mt-4 space-y-4">
-            <FileUpload />
+            <FileUpload 
+              uploadedFiles={uploadedFiles}
+              setUploadedFiles={setUploadedFiles}
+              isLoading={isLoading}
+              onFileAdded={handleFileAdded}
+            />
             <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm dark:bg-gray-800/90">
               <div className="p-4">
                 <div className="flex space-x-4">

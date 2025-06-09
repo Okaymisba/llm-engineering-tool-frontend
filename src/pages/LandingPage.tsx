@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { Sparkles, Brain, CreditCard, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -10,12 +11,8 @@ export const LandingPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // If user is logged in, redirect to chat
-  React.useEffect(() => {
-    if (user) {
-      navigate('/chat');
-    }
-  }, [user, navigate]);
+  // Use the auth redirect hook
+  useAuthRedirect();
 
   // Don't render anything while redirecting
   if (user) {
@@ -132,10 +129,8 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Models Showcase - Wrapped in error boundary */}
-      <React.Suspense fallback={<div className="py-16 text-center">Loading models...</div>}>
-        <ModelsShowcase />
-      </React.Suspense>
+      {/* Models Showcase */}
+      <ModelsShowcase />
 
       {/* Footer */}
       <footer className="border-t bg-white/80 backdrop-blur-sm">

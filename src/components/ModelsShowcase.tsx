@@ -17,8 +17,9 @@ interface Model {
 export const ModelsShowcase: React.FC = () => {
   const { data: models, isLoading, error } = useQuery({
     queryKey: ['models'],
-    queryFn: async () => {
+    queryFn: async (): Promise<Model[]> => {
       try {
+        console.log('Fetching models from Supabase...');
         const { data, error } = await supabase
           .from('models')
           .select('id, name, total_tokens_this_month, provider, is_enabled')
@@ -27,18 +28,26 @@ export const ModelsShowcase: React.FC = () => {
           .limit(10);
 
         if (error) {
-          console.error('Error fetching models:', error);
+          console.error('Supabase error:', error);
           throw error;
         }
 
-        return data as Model[];
+        console.log('Models fetched successfully:', data);
+        return data || [];
       } catch (err) {
-        console.error('Failed to fetch models:', err);
+        console.error('Error in queryFn:', err);
+        // Return empty array instead of throwing to prevent the component from crashing
         return [];
       }
     },
     retry: 1,
     refetchOnWindowFocus: false,
+    // Add error handling to prevent crashes
+    meta: {
+      onError: (error: any) => {
+        console.error('Query error:', error);
+      }
+    }
   });
 
   if (isLoading) {
@@ -56,8 +65,10 @@ export const ModelsShowcase: React.FC = () => {
     );
   }
 
-  if (error || !models) {
-    return null; // Don't show anything if there's an error
+  // Don't render anything if there's an error or no models - fail silently
+  if (error) {
+    console.error('ModelsShowcase error:', error);
+    return null;
   }
 
   return (

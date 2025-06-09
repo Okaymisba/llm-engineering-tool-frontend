@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { Sparkles, Brain, CreditCard, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -11,11 +10,8 @@ export const LandingPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Use the auth redirect hook
-  useAuthRedirect();
-
-  // Don't render anything while redirecting
   if (user) {
+    navigate('/chat');
     return null;
   }
 
@@ -72,19 +68,19 @@ export const LandingPage: React.FC = () => {
             Unlock the Power of AI
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
+            {/* Feature 1 - Updated icon */}
             <div className="text-center">
               <Brain className="mx-auto h-12 w-12 text-blue-600 mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Diverse AI Models</h3>
               <p className="text-gray-600">Access a wide range of AI models, each optimized for different tasks.</p>
             </div>
-            {/* Feature 2 */}
+            {/* Feature 2 - Updated icon */}
             <div className="text-center">
               <CreditCard className="mx-auto h-12 w-12 text-blue-600 mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Pay-As-You-Go Pricing</h3>
               <p className="text-gray-600">Only pay for what you use. No subscriptions, no hidden fees.</p>
             </div>
-            {/* Feature 3 */}
+            {/* Feature 3 - Updated icon */}
             <div className="text-center">
               <Plug className="mx-auto h-12 w-12 text-blue-600 mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Easy Integration</h3>

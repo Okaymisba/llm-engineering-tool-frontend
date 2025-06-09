@@ -17,37 +17,21 @@ interface Model {
 export const ModelsShowcase: React.FC = () => {
   const { data: models, isLoading, error } = useQuery({
     queryKey: ['models'],
-    queryFn: async (): Promise<Model[]> => {
-      try {
-        console.log('Fetching models from Supabase...');
-        const { data, error } = await supabase
-          .from('models')
-          .select('id, name, total_tokens_this_month, provider, is_enabled')
-          .eq('is_enabled', true)
-          .order('total_tokens_this_month', { ascending: false, nullsFirst: false })
-          .limit(10);
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('models')
+        .select('id, name, total_tokens_this_month, provider, is_enabled')
+        .eq('is_enabled', true)
+        .order('total_tokens_this_month', { ascending: false })
+        .limit(10);
 
-        if (error) {
-          console.error('Supabase error:', error);
-          throw error;
-        }
-
-        console.log('Models fetched successfully:', data);
-        return data || [];
-      } catch (err) {
-        console.error('Error in queryFn:', err);
-        // Return empty array instead of throwing to prevent the component from crashing
-        return [];
+      if (error) {
+        console.error('Error fetching models:', error);
+        throw error;
       }
+
+      return data as Model[];
     },
-    retry: 1,
-    refetchOnWindowFocus: false,
-    // Add error handling to prevent crashes
-    meta: {
-      onError: (error: any) => {
-        console.error('Query error:', error);
-      }
-    }
   });
 
   if (isLoading) {
@@ -65,10 +49,8 @@ export const ModelsShowcase: React.FC = () => {
     );
   }
 
-  // Don't render anything if there's an error or no models - fail silently
-  if (error) {
-    console.error('ModelsShowcase error:', error);
-    return null;
+  if (error || !models) {
+    return null; // Don't show anything if there's an error
   }
 
   return (
@@ -93,45 +75,45 @@ export const ModelsShowcase: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {models && models.length > 0 ? (
-                  models.map((model, index) => (
-                    <div
-                      key={model.id}
-                      className="flex items-center justify-between p-6 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 transition-all duration-200 border border-blue-100"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className="flex-shrink-0">
-                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                            {index + 1}
-                          </div>
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                            {model.name}
-                          </h3>
-                          <div className="flex items-center space-x-2">
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                              {model.provider}
-                            </Badge>
-                          </div>
+                {models.map((model, index) => (
+                  <div
+                    key={model.id}
+                    className="flex items-center justify-between p-6 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 transition-all duration-200 border border-blue-100"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                          {index + 1}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="flex items-center text-2xl font-bold text-gray-900 mb-1">
-                          <Zap className="w-5 h-5 mr-1 text-yellow-500" />
-                          {(model.total_tokens_this_month || 0).toLocaleString()}
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                          {model.name}
+                        </h3>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                            {model.provider}
+                          </Badge>
                         </div>
-                        <p className="text-sm text-gray-600">tokens used</p>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-12 text-gray-500">
-                    <Zap className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                    <p className="text-lg">No usage data available for this month</p>
+                    <div className="text-right">
+                      <div className="flex items-center text-2xl font-bold text-gray-900 mb-1">
+                        <Zap className="w-5 h-5 mr-1 text-yellow-500" />
+                        {(model.total_tokens_this_month || 0).toLocaleString()}
+                      </div>
+                      <p className="text-sm text-gray-600">tokens used</p>
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
+              
+              {models.length === 0 && (
+                <div className="text-center py-12 text-gray-500">
+                  <Zap className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-lg">No usage data available for this month</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

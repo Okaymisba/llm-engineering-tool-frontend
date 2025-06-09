@@ -167,13 +167,17 @@ export type Database = {
       }
       models: {
         Row: {
+          badge: string | null
           created_at: string
+          description: string | null
           id: string
           input_cost_per_token: number | null
           is_enabled: boolean | null
+          is_reasoning: boolean | null
           last_updated_month: number | null
           last_updated_year: number | null
           max_tokens: number
+          model_id: string
           name: string
           output_cost_per_token: number | null
           provider: string
@@ -182,13 +186,17 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          badge?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           input_cost_per_token?: number | null
           is_enabled?: boolean | null
+          is_reasoning?: boolean | null
           last_updated_month?: number | null
           last_updated_year?: number | null
           max_tokens: number
+          model_id: string
           name: string
           output_cost_per_token?: number | null
           provider: string
@@ -197,13 +205,17 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          badge?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           input_cost_per_token?: number | null
           is_enabled?: boolean | null
+          is_reasoning?: boolean | null
           last_updated_month?: number | null
           last_updated_year?: number | null
           max_tokens?: number
+          model_id?: string
           name?: string
           output_cost_per_token?: number | null
           provider?: string

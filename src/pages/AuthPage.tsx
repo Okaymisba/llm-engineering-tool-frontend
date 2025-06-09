@@ -1,22 +1,22 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LoginFormWithGoogle } from '@/components/auth/LoginFormWithGoogle';
 import { SignupFormWithGoogle } from '@/components/auth/SignupFormWithGoogle';
 import { OTPVerification } from '@/components/auth/OTPVerification';
 import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm';
 import { ResetPasswordOTP } from '@/components/auth/ResetPasswordOTP';
 import { NewPasswordForm } from '@/components/auth/NewPasswordForm';
-import { Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle } from 'lucide-react';
+import { useAuthState } from '@/contexts/AuthStateContext';
 
 type AuthStep = 'login' | 'signup' | 'verify-otp' | 'forgot-password' | 'reset-otp' | 'new-password' | 'password-reset-success';
 
 export const AuthPage: React.FC = () => {
-  const [currentStep, setCurrentStep] = useState<AuthStep>('login');
+  const { authState, setAuthState } = useAuthState();
+  const [currentStep, setCurrentStep] = useState<AuthStep>(authState || 'login');
   const [signupData, setSignupData] = useState<{ email: string; username: string } | null>(null);
   const [resetData, setResetData] = useState<{ email: string; resetToken?: string } | null>(null);
   const navigate = useNavigate();
@@ -24,8 +24,23 @@ export const AuthPage: React.FC = () => {
   // Handle automatic redirect after successful login
   useAuthRedirect();
 
-  const handleSwitchToSignup = () => setCurrentStep('signup');
-  const handleSwitchToLogin = () => setCurrentStep('login');
+  // Reset auth state when component unmounts
+  useEffect(() => {
+    return () => {
+      setAuthState(null);
+    };
+  }, [setAuthState]);
+
+  const handleSwitchToSignup = () => {
+    setCurrentStep('signup');
+    setAuthState('signup');
+  };
+
+  const handleSwitchToLogin = () => {
+    setCurrentStep('login');
+    setAuthState('login');
+  };
+
   const handleSwitchToForgotPassword = () => setCurrentStep('forgot-password');
 
   const handleSignupSuccess = (email: string, username: string) => {
@@ -76,19 +91,6 @@ export const AuthPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/')}>
-            <Sparkles className="h-8 w-8 text-blue-600" />
-            <span className="text-2xl font-bold text-gray-900">AIHub</span>
-          </div>
-          <Button variant="ghost" onClick={() => navigate('/')}>
-            Back to Home
-          </Button>
-        </div>
-      </header>
-
       {/* Main Content */}
       <div className="flex items-center justify-center min-h-[calc(100vh-80px)] p-4">
         <div className="w-full max-w-md">

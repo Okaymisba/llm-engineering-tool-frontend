@@ -1,25 +1,16 @@
-import React, { useEffect, useState } from 'react';
+
+import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
 
-interface Model {
-  id: string;
-  name: string;
-  badge: string;
-  description: string;
-  provider: string;
-  isReasoning?: boolean;
-}
-
-export const fetchModels = async (): Promise<Model[]> => {
-  const { data, error } = await supabase.from('models').select('*');
-  if (error) {
-    console.error('Error fetching models:', error);
-    return [];
-  }
-  return data || [];
-};
+const models = [
+  { id: 'gemini-2.0-flash', name: 'Google: Gemini 2.0 Flash', badge: 'Free', description: 'Fast responses, great for general tasks', provider: 'google' },
+  { id: 'Deepseek-r1-0528:free', name: 'Deepseek: R1 (Reasoning)', badge: 'Free', description: 'Advanced reasoning capabilities', provider: 'deepseek', isReasoning: true },
+  { id: 'Deepseek-chat-v3-0324:free', name: 'Deepseek: V3', badge: 'Free', description: 'Powerful conversational AI', provider: 'deepseek' },
+  { id: 'gpt-4o', name: 'OpenAI: GPT-4o', badge: 'Paid', description: 'Most capable model for complex tasks', provider: 'openai' },
+  { id: 'claude-3.5-sonnet', name: 'Anthropic: Claude 3.5 Sonnet', badge: 'Paid', description: 'Excellent for analysis and writing', provider: 'anthropic' },
+  { id: 'gpt-4o-mini', name: 'OpenAI: GPT-4o Mini', badge: 'Paid', description: 'Balanced speed and capability', provider: 'openai' },
+];
 
 interface ModelSelectorProps {
   selectedModel: string;
@@ -27,25 +18,6 @@ interface ModelSelectorProps {
 }
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModel, onModelChange }) => {
-  const [models, setModels] = useState<Model[]>([]);
-
-  useEffect(() => {
-    const loadModels = async () => {
-      const fetchedModels = await fetchModels();
-      setModels(fetchedModels);
-
-      // Set the default model if none is selected
-      if (!selectedModel && fetchedModels.length > 0) {
-        const defaultModel = fetchedModels.find((model) => model.name === 'Gemini 2.0');
-        if (defaultModel) {
-          onModelChange(defaultModel.id);
-        }
-      }
-    };
-
-    loadModels();
-  }, [selectedModel, onModelChange]);
-
   return (
     <div className="flex-1 max-w-md mx-8">
       <Select value={selectedModel} onValueChange={onModelChange}>
@@ -59,14 +31,11 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModel, onM
                 <div className="flex flex-col">
                   <div className="flex items-center space-x-2">
                     <span className="font-medium">{model.name}</span>
-                    <Badge
-                      variant={model.badge === 'Free' ? 'default' : 'secondary'}
-                      className={
-                        model.badge === 'Free'
-                          ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                          : 'bg-purple-100 text-purple-700 hover:bg-purple-100'
-                      }
-                    >
+                    <Badge variant={model.badge === 'Free' ? 'default' : 'secondary'} className={
+                      model.badge === 'Free' 
+                        ? 'bg-green-100 text-green-700 hover:bg-green-100' 
+                        : 'bg-purple-100 text-purple-700 hover:bg-purple-100'
+                    }>
                       {model.badge}
                     </Badge>
                   </div>
@@ -80,3 +49,5 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModel, onM
     </div>
   );
 };
+
+export { models };

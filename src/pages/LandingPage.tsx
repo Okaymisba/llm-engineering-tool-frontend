@@ -132,8 +132,10 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Models Showcase */}
-      <ModelsShowcase />
+      {/* Models Showcase - Wrapped in error boundary */}
+      <React.Suspense fallback={<div className="py-16 text-center">Loading models...</div>}>
+        <ModelsShowcase />
+      </React.Suspense>
 
       {/* Footer */}
       <footer className="border-t bg-white/80 backdrop-blur-sm">

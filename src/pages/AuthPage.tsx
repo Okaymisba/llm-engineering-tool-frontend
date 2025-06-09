@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { LoginForm } from '@/components/auth/LoginForm';
-import { SignupForm } from '@/components/auth/SignupForm';
+import { LoginFormWithGoogle } from '@/components/auth/LoginFormWithGoogle';
+import { SignupFormWithGoogle } from '@/components/auth/SignupFormWithGoogle';
 import { OTPVerification } from '@/components/auth/OTPVerification';
 import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm';
 import { ResetPasswordOTP } from '@/components/auth/ResetPasswordOTP';
@@ -93,7 +93,7 @@ export const AuthPage: React.FC = () => {
       <div className="flex items-center justify-center min-h-[calc(100vh-80px)] p-4">
         <div className="w-full max-w-md">
           {currentStep === 'login' && (
-            <LoginForm 
+            <LoginFormWithGoogle 
               onSwitchToSignup={handleSwitchToSignup}
               onNeedVerification={handleNeedVerification}
               onForgotPassword={handleSwitchToForgotPassword}
@@ -101,7 +101,7 @@ export const AuthPage: React.FC = () => {
           )}
           
           {currentStep === 'signup' && (
-            <SignupForm 
+            <SignupFormWithGoogle 
               onSwitchToLogin={handleSwitchToLogin}
               onSignupSuccess={handleSignupSuccess}
             />

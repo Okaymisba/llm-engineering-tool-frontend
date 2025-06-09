@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, Mail, KeyRound, ArrowLeft } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface ForgotPasswordFormProps {
   onOTPSent: (email: string) => void;
@@ -17,35 +18,27 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
   onBack
 }) => {
   const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  const API_BASE_URL = 'http://localhost:8000';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    if (!email || !username) {
-      setError('Please fill in all fields');
+    if (!email) {
+      setError('Please enter your email address');
       setIsLoading(false);
       return;
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, username }),
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth?step=reset-password`,
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to send reset email');
+      if (error) {
+        throw new Error(error.message);
       }
 
       onOTPSent(email);
@@ -64,7 +57,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
         </div>
         <CardTitle className="text-2xl font-bold text-gray-900">Reset Password</CardTitle>
         <CardDescription className="text-gray-600">
-          Enter your email and username to receive a password reset code
+          Enter your email address to receive a password reset link
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -89,20 +82,6 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="username" className="text-gray-700 font-medium">Username</Label>
-            <Input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
-              className="border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-              required
-              disabled={isLoading}
-            />
-          </div>
-
           <Button 
             type="submit" 
             className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium" 
@@ -112,7 +91,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
               'Sending...'
             ) : (
               <>
-                Send Reset Code
+                Send Reset Link
                 <ArrowRight className="ml-2 h-4 w-4" />
               </>
             )}

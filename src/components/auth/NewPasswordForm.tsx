@@ -1,11 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, Lock, Eye, EyeOff } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useSearchParams } from 'react-router-dom';
 
 interface NewPasswordFormProps {
   email: string;
@@ -24,8 +26,28 @@ export const NewPasswordForm: React.FC<NewPasswordFormProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [searchParams] = useSearchParams();
 
-  const API_BASE_URL = 'http://localhost:8000';
+  useEffect(() => {
+    // Handle the session from URL params if this is a password reset from email
+    const handlePasswordReset = async () => {
+      const accessToken = searchParams.get('access_token');
+      const refreshToken = searchParams.get('refresh_token');
+      
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        
+        if (error) {
+          setError('Invalid reset link. Please request a new password reset.');
+        }
+      }
+    };
+
+    handlePasswordReset();
+  }, [searchParams]);
 
   const validatePassword = (password: string): boolean => {
     const minLength = password.length >= 8;
@@ -57,25 +79,12 @@ export const NewPasswordForm: React.FC<NewPasswordFormProps> = ({
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/reset-password?reset_token=${resetToken}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email,
-          new_password: newPassword
-        }),
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Password reset failed');
-      }
-
-      if (!data.success) {
-        throw new Error(data.message || 'Password reset failed');
+      if (error) {
+        throw new Error(error.message);
       }
 
       onPasswordReset();

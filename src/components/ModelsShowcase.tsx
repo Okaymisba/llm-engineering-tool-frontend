@@ -22,7 +22,7 @@ export const ModelsShowcase: React.FC = () => {
         .from('models')
         .select('id, name, total_tokens_this_month, provider, is_enabled')
         .eq('is_enabled', true)
-        .order('total_tokens_this_month', { ascending: false })
+        .order('total_tokens_this_month', { ascending: false, nullsLast: true })
         .limit(10);
 
       if (error) {

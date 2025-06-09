@@ -1,589 +1,154 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Settings, LogOut, History, X, ArrowDown } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { useAuth } from '@/contexts/AuthContext';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { useToast } from '@/hooks/use-toast';
-import { useIsMobile } from '@/hooks/use-mobile';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Navbar } from '@/components/layout/Navbar';
+import { ModelSelectorDropdown } from '@/components/chat/ModelSelectorDropdown';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { FileUpload } from '@/components/chat/FileUpload';
-import { ModelSelector, models } from '@/components/chat/ModelSelector';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Card } from '@/components/ui/card';
+import { Send, Bot } from 'lucide-react';
 
 interface Message {
   id: string;
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
-  isStreaming?: boolean;
-  reasoning?: string;
-  isReasoningComplete?: boolean;
-  metadata?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
 }
-
-interface UploadedFile {
-  file: File;
-  type: 'image' | 'document';
-  preview?: string;
-}
-
-// Helper function to parse JSON objects from stream
-const parseJSONStream = (buffer: string): { parsed: any[], remaining: string } => {
-  const parsed: any[] = [];
-  let remaining = buffer;
-  let depth = 0;
-  let start = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = 0; i < remaining.length; i++) {
-    const char = remaining[i];
-    
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    
-    if (char === '\\') {
-      escaped = true;
-      continue;
-    }
-    
-    if (char === '"') {
-      inString = !inString;
-      continue;
-    }
-    
-    if (inString) continue;
-    
-    if (char === '{') {
-      depth++;
-    } else if (char === '}') {
-      depth--;
-      
-      if (depth === 0) {
-        const jsonStr = remaining.substring(start, i + 1);
-        try {
-          const obj = JSON.parse(jsonStr);
-          parsed.push(obj);
-        } catch (e) {
-          console.warn('Failed to parse JSON object:', jsonStr);
-        }
-        start = i + 1;
-      }
-    }
-  }
-  
-  return {
-    parsed,
-    remaining: remaining.substring(start)
-  };
-};
 
 export const ChatPage: React.FC = () => {
-  const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState('');
+  const [input, setInput] = useState('');
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [isUserScrolled, setIsUserScrolled] = useState(false);
-  
-  const { user, token, logout } = useAuth();
-  const { toast } = useToast();
-  const isMobile = useIsMobile();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
-    messagesEndRef.current?.scrollIntoView({ behavior });
-    setShowScrollToBottom(false);
-    setIsUserScrolled(false);
-  };
-
-  const handleScroll = () => {
-    if (!scrollContainerRef.current) return;
-    
-    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-    
-    setShowScrollToBottom(!isNearBottom);
-    setIsUserScrolled(scrollTop > 0 && !isNearBottom);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
-    if (!isUserScrolled) {
-      scrollToBottom();
-    }
+    scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.isStreaming && !isLoading) {
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
-    }
-  }, [messages, isLoading]);
-
-  // Cleanup on unmount or page reload
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
-  const handleCancelRequest = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-      setIsLoading(false);
-      
-      // Update the last message to show it was cancelled
-      setMessages(prev => 
-        prev.map((msg, index) => 
-          index === prev.length - 1 && msg.role === 'assistant' && msg.isStreaming
-            ? { 
-                ...msg, 
-                content: msg.content + '\n\n*Response was cancelled*',
-                isStreaming: false,
-                isReasoningComplete: true
-              }
-            : msg
-        )
-      );
-
-      toast({
-        title: "Request Cancelled",
-        description: "The response generation has been stopped.",
-      });
-    }
-  };
-
-  const handleFileAdded = (newFiles: UploadedFile[]) => {
-    setUploadedFiles(prev => [...prev, ...newFiles]);
-  };
-
-  const handleSendMessage = async () => {
-    if ((!inputValue.trim() && uploadedFiles.length === 0) || isLoading) return;
-
-    if (!token) {
-      toast({
-        title: "Authentication Error",
-        description: "Please log in to send messages.",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleSend = async () => {
+    if (!input.trim() || !selectedModel) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: inputValue,
+      content: input.trim(),
       role: 'user',
       timestamp: new Date(),
     };
 
     setMessages(prev => [...prev, userMessage]);
-    const currentInput = inputValue;
-    const currentFiles = [...uploadedFiles];
-    setInputValue('');
-    setUploadedFiles([]);
+    setInput('');
     setIsLoading(true);
-    setIsUserScrolled(false);
 
-    const aiMessageId = (Date.now() + 1).toString();
-    const selectedModelData = models.find(m => m.id === selectedModel);
-    const isReasoningModel = selectedModelData?.isReasoning || false;
-    
-    const aiMessage: Message = {
-      id: aiMessageId,
-      content: '',
-      role: 'assistant',
-      timestamp: new Date(),
-      isStreaming: true,
-      reasoning: isReasoningModel ? '' : undefined,
-      isReasoningComplete: false,
-    };
-
-    setMessages(prev => [...prev, aiMessage]);
-
-    try {
-      const formData = new FormData();
-      formData.append('session_id', sessionId);
-      formData.append('question', currentInput);
-      formData.append('provider', selectedModelData?.provider || 'google');
-      formData.append('model', selectedModel);
-      formData.append('our_image_processing_algo', 'false');
-      formData.append('document_semantic_search', 'false');
-
-      currentFiles.forEach((uploadedFile) => {
-        if (uploadedFile.type === 'image') {
-          formData.append('upload_image', uploadedFile.file);
-        } else {
-          formData.append('upload_document', uploadedFile.file);
-        }
-      });
-
-      const API_BASE_URL = 'http://localhost:8000';
-      abortControllerRef.current = new AbortController();
-
-      const response = await fetch(`${API_BASE_URL}/chat`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-        signal: abortControllerRef.current.signal,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedContent = '';
-      let accumulatedReasoning = '';
-      let isReasoningPhase = isReasoningModel;
-      let buffer = '';
-
-      if (reader) {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            
-            if (done) break;
-            
-            const chunk = decoder.decode(value, { stream: true });
-            buffer += chunk;
-            
-            const { parsed, remaining } = parseJSONStream(buffer);
-            buffer = remaining;
-            
-            for (const parsedChunk of parsed) {
-              if (parsedChunk.type === 'reasoning') {
-                accumulatedReasoning += parsedChunk.data;
-                setMessages(prev => 
-                  prev.map(msg => 
-                    msg.id === aiMessageId 
-                      ? { ...msg, reasoning: accumulatedReasoning }
-                      : msg
-                  )
-                );
-              } else if (parsedChunk.type === 'content') {
-                if (isReasoningPhase) {
-                  isReasoningPhase = false;
-                  setMessages(prev => 
-                    prev.map(msg => 
-                      msg.id === aiMessageId 
-                        ? { ...msg, isReasoningComplete: true }
-                        : msg
-                    )
-                  );
-                }
-                accumulatedContent += parsedChunk.data;
-                setMessages(prev => 
-                  prev.map(msg => 
-                    msg.id === aiMessageId 
-                      ? { ...msg, content: accumulatedContent }
-                      : msg
-                  )
-                );
-              } else if (parsedChunk.type === 'metadata') {
-                setMessages(prev => 
-                  prev.map(msg => 
-                    msg.id === aiMessageId 
-                      ? { ...msg, metadata: parsedChunk.data }
-                      : msg
-                  )
-                );
-              }
-            }
-          }
-        } finally {
-          reader.releaseLock();
-        }
-      }
-
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === aiMessageId 
-            ? { ...msg, isStreaming: false, isReasoningComplete: true }
-            : msg
-        )
-      );
-
-    } catch (error) {
-      console.error('Error sending message:', error);
-      
-      if (error instanceof Error && error.name === 'AbortError') {
-        return;
-      }
-      
-      let errorMessage = "Failed to send message. Please try again.";
-      if (error instanceof Error) {
-        if (error.message.includes('Failed to fetch')) {
-          errorMessage = "Unable to connect to server. Please check your connection.";
-        } else if (error.message.includes('401')) {
-          errorMessage = "Authentication failed. Please log in again.";
-        } else if (error.message.includes('403')) {
-          errorMessage = "Access denied. Please check your permissions.";
-        } else if (error.message.includes('404')) {
-          errorMessage = "Chat endpoint not found. Please check server configuration.";
-        } else if (error.message.includes('500')) {
-          errorMessage = "Server error. Please try again later.";
-        }
-      }
-      
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-      
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === aiMessageId 
-            ? { 
-                ...msg, 
-                content: "Sorry, I encountered an error while processing your request. Please try again.",
-                isStreaming: false
-              }
-            : msg
-        )
-      );
-    } finally {
+    // Simulate AI response
+    setTimeout(() => {
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: `I'm a simulated response to: "${userMessage.content}". This is where the actual AI model would respond using the selected model.`,
+        role: 'assistant',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, assistantMessage]);
       setIsLoading(false);
-      abortControllerRef.current = null;
-    }
+    }, 1000);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      handleSend();
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    toast({
-      title: "Logged out",
-      description: "You have been successfully logged out.",
-    });
-  };
-
-  const handleSettings = () => {
-    toast({
-      title: "Settings",
-      description: "Settings page coming soon!",
-    });
-  };
-
-  const handleChatHistory = () => {
-    toast({
-      title: "Chat History",
-      description: "Chat history feature coming soon!",
-    });
-  };
-
   return (
-    <div className="min-h-screen w-full bg-gray-50 flex flex-col font-sans">
-      {/* Header */}
-      <header className="border-b bg-white/90 backdrop-blur-sm sticky top-0 z-20 shrink-0">
-        <div className="w-full max-w-4xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-6 w-6 text-green-600" />
-                <span className="text-xl font-semibold text-gray-900">Syncmind</span>
-              </div>
-              
-              {!isMobile && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleChatHistory}
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  <History className="h-4 w-4 mr-2" />
-                  History
-                </Button>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <Navbar />
+      
+      <div className="container mx-auto px-4 py-6 max-w-6xl">
+        {/* Header with Model Selector */}
+        <div className="flex justify-center mb-6">
+          <div className="flex items-center space-x-4">
+            <Bot className="h-6 w-6 text-blue-600" />
+            <ModelSelectorDropdown
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
+            />
+          </div>
+        </div>
+
+        {/* Chat Container */}
+        <div className="flex flex-col h-[calc(100vh-200px)]">
+          {/* Messages Area */}
+          <Card className="flex-1 overflow-hidden border-0 shadow-xl bg-white/90 backdrop-blur-sm dark:bg-gray-800/90">
+            <div className="h-full overflow-y-auto p-6">
+              {messages.length === 0 ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center space-y-4">
+                    <Bot className="h-16 w-16 mx-auto text-gray-400" />
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                        Welcome to AIHub Chat
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        {selectedModel ? 'Start a conversation by typing a message below.' : 'Select a model above to get started.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {messages.map((message) => (
+                    <ChatMessage key={message.id} message={message} />
+                  ))}
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 max-w-md">
+                        <div className="flex items-center space-x-2">
+                          <div className="animate-pulse flex space-x-1">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
               )}
             </div>
-            
-            <div className="flex items-center gap-3">
-              <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+          </Card>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors">
-                    {!isMobile && (
-                      <span className="text-sm text-gray-600">{user?.username}</span>
-                    )}
-                    <Avatar className="h-7 w-7">
-                      <AvatarFallback className="bg-green-100 text-green-600 text-sm">
-                        {user?.username?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-white border shadow-lg">
-                  <div className="px-3 py-2">
-                    <p className="text-sm font-medium text-gray-900">{user?.username}</p>
-                    <p className="text-xs text-gray-500">{user?.email}</p>
-                  </div>
-                  <DropdownMenuSeparator />
-                  {isMobile && (
-                    <>
-                      <DropdownMenuItem onClick={handleChatHistory}>
-                        <History className="mr-2 h-4 w-4" />
-                        History
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  <DropdownMenuItem onClick={handleSettings}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Log out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Chat Container */}
-      <div className="flex-1 w-full max-w-4xl mx-auto px-4 flex flex-col relative">
-        {/* Messages Area */}
-        <div 
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto py-6 space-y-4"
-          style={{ minHeight: 0 }}
-        >
-          {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full min-h-[400px]">
-              <div className="text-center max-w-md">
-                <Sparkles className="h-12 w-12 text-green-600 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">How can I help you today?</h3>
-                <p className="text-gray-600">
-                  Start a conversation with {models.find(m => m.id === selectedModel)?.name}.
-                </p>
+          {/* Input Area */}
+          <div className="mt-4 space-y-4">
+            <FileUpload />
+            <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm dark:bg-gray-800/90">
+              <div className="p-4">
+                <div className="flex space-x-4">
+                  <Textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder={selectedModel ? "Type your message..." : "Please select a model first"}
+                    className="flex-1 min-h-[60px] resize-none border-0 focus:ring-0 bg-transparent"
+                    disabled={!selectedModel || isLoading}
+                  />
+                  <Button
+                    onClick={handleSend}
+                    disabled={!input.trim() || !selectedModel || isLoading}
+                    size="icon"
+                    className="h-12 w-12 shrink-0"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          ) : (
-            messages.map((message) => (
-              <ChatMessage 
-                key={message.id} 
-                message={message} 
-                username={user?.username} 
-              />
-            ))
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Scroll to Bottom Button */}
-        {showScrollToBottom && (
-          <Button
-            onClick={() => scrollToBottom()}
-            className="fixed bottom-24 right-8 h-10 w-10 rounded-full bg-white border shadow-lg hover:shadow-xl z-10"
-            size="icon"
-            variant="outline"
-          >
-            <ArrowDown className="h-4 w-4" />
-          </Button>
-        )}
-
-        {/* Cancel Button during streaming */}
-        {isLoading && (
-          <div className="flex justify-center py-4">
-            <Button
-              onClick={handleCancelRequest}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
-            >
-              <X className="h-4 w-4" />
-              Stop generating
-            </Button>
-          </div>
-        )}
-
-        {/* Input Area */}
-        <div className="py-4 sticky bottom-0 bg-gray-50">
-          <div className="bg-white rounded-xl border shadow-sm p-3">
-            <div className="flex items-end gap-3">
-              <FileUpload 
-                uploadedFiles={uploadedFiles}
-                setUploadedFiles={setUploadedFiles}
-                isLoading={isLoading}
-                onFileAdded={handleFileAdded}
-              />
-              
-              <div className="flex-1 min-w-0 relative">
-                <Textarea
-                  ref={inputRef}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  placeholder="Message Syncmind..."
-                  className="min-h-[24px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base"
-                  disabled={isLoading}
-                  rows={1}
-                  style={{ 
-                    height: 'auto',
-                    lineHeight: '1.5'
-                  }}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
-                  }}
-                />
-              </div>
-              
-              <Button
-                onClick={handleSendMessage}
-                disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading}
-                size="icon"
-                className="h-8 w-8 bg-gray-900 hover:bg-gray-800 rounded-lg shrink-0"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
+            </Card>
           </div>
         </div>
       </div>

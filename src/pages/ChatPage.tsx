@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Settings, LogOut, History, X, ArrowDown } from 'lucide-react';
+import { Send, Sparkles, Settings, LogOut, History, X, ArrowDown, User, UserCheck2Icon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
@@ -415,75 +415,6 @@ export const ChatPage: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full bg-gray-50 flex flex-col font-sans">
-      {/* Header */}
-      <header className="border-b bg-white/90 backdrop-blur-sm sticky top-0 z-20 shrink-0">
-        <div className="w-full max-w-4xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-6 w-6 text-green-600" />
-                <span className="text-xl font-semibold text-gray-900">Syncmind</span>
-              </div>
-              
-              {!isMobile && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleChatHistory}
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  <History className="h-4 w-4 mr-2" />
-                  History
-                </Button>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors">
-                    {!isMobile && (
-                      <span className="text-sm text-gray-600">{user?.username}</span>
-                    )}
-                    <Avatar className="h-7 w-7">
-                      <AvatarFallback className="bg-green-100 text-green-600 text-sm">
-                        {user?.username?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-white border shadow-lg">
-                  <div className="px-3 py-2">
-                    <p className="text-sm font-medium text-gray-900">{user?.username}</p>
-                    <p className="text-xs text-gray-500">{user?.email}</p>
-                  </div>
-                  <DropdownMenuSeparator />
-                  {isMobile && (
-                    <>
-                      <DropdownMenuItem onClick={handleChatHistory}>
-                        <History className="mr-2 h-4 w-4" />
-                        History
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  <DropdownMenuItem onClick={handleSettings}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Log out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
-      </header>
 
       {/* Chat Container */}
       <div className="flex-1 w-full max-w-4xl mx-auto px-4 flex flex-col relative">

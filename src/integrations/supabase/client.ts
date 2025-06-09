@@ -5,7 +5,34 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://npzxrwegjfvpxvojinpm.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5wenhyd2VnamZ2cHh2b2ppbnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyMDU1NzIsImV4cCI6MjA2NDc4MTU3Mn0.DoEFurVmAP0_GSL8DAbvgiFF8lj469XkKIQLzlAnf8E";
 
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error('Missing Supabase environment variables');
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+// Create a single instance of the Supabase client
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
+  }
+});
+
+// Test the connection
+supabase.auth.getSession().then(
+  ({ data: { session }, error }) => {
+    if (error) {
+      console.error('Supabase connection error:', error.message);
+    } else {
+      console.log('Supabase connected successfully');
+    }
+  }
+);

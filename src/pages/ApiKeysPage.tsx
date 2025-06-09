@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ArrowLeft, Plus, Copy, Eye, EyeOff, Upload, MoreVertical, RefreshCw, Trash2, FileText } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ApiKeyInfo {
@@ -41,7 +40,7 @@ export const ApiKeysPage: React.FC = () => {
   const [formData, setFormData] = useState({
     label: '',
     instructions: '',
-    token_limit: 1000
+    token_limit: -1
   });
 
   const { toast } = useToast();
@@ -98,13 +97,8 @@ export const ApiKeysPage: React.FC = () => {
         .from('apis')
         .insert({
           user_id: user.id,
-          api_key: apiKey,
           label: formData.label,
           instructions: formData.instructions,
-          token_limit_per_day: formData.token_limit,
-          total_tokens: formData.token_limit,
-          tokens_used: 0,
-          tokens_remaining: formData.token_limit
         })
         .select()
         .single();
@@ -113,10 +107,10 @@ export const ApiKeysPage: React.FC = () => {
         throw error;
       }
 
-      setNewApiKey(apiKey);
+      setNewApiKey(data.api_key);
       setShowNewKeyDialog(false);
       fetchApiKeys();
-      setFormData({ label: '', instructions: '', token_limit: 1000 });
+      setFormData({ label: '', instructions: '', token_limit: -1 });
       toast({
         title: "Success",
         description: "API key created successfully",
@@ -317,11 +311,9 @@ export const ApiKeysPage: React.FC = () => {
                   <Label htmlFor="token_limit">Daily Token Limit</Label>
                   <Input
                     id="token_limit"
-                    type="number"
-                    value={formData.token_limit}
-                    onChange={(e) => setFormData({ ...formData, token_limit: parseInt(e.target.value) || 1000 })}
-                    min="100"
-                    max="100000"
+                    placeholder="Unlimited by default"
+                    value={formData.token_limit === -1 ? "" : formData.token_limit}
+                    onChange={(e) => setFormData({ ...formData, token_limit: e.target.value === "" ? -1 : parseInt(e.target.value) })}
                   />
                 </div>
               </div>

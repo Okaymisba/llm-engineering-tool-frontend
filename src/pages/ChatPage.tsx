@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { FileUpload } from '@/components/chat/FileUpload';
-import { ModelSelector, models } from '@/components/chat/ModelSelector';
+import { ModelSelector, fetchModels } from '@/components/chat/ModelSelector'; // Updated import
 
 interface Message {
   id: string;
@@ -92,7 +92,7 @@ const parseJSONStream = (buffer: string): { parsed: any[], remaining: string } =
 };
 
 export const ChatPage: React.FC = () => {
-  const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
+  const [selectedModel, setSelectedModel] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -100,7 +100,8 @@ export const ChatPage: React.FC = () => {
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isUserScrolled, setIsUserScrolled] = useState(false);
-  
+  const [availableModels, setAvailableModels] = useState<Model[]>([]); // New state for models
+
   const { user, token, logout } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -216,7 +217,7 @@ export const ChatPage: React.FC = () => {
     setIsUserScrolled(false);
 
     const aiMessageId = (Date.now() + 1).toString();
-    const selectedModelData = models.find(m => m.id === selectedModel);
+    const selectedModelData = availableModels.find(m => m.id === selectedModel);
     const isReasoningModel = selectedModelData?.isReasoning || false;
     
     const aiMessage: Message = {
@@ -499,7 +500,7 @@ export const ChatPage: React.FC = () => {
                 <Sparkles className="h-12 w-12 text-green-600 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">How can I help you today?</h3>
                 <p className="text-gray-600">
-                  Start a conversation with {models.find(m => m.id === selectedModel)?.name}.
+                  Start a conversation with {availableModels.find(m => m.id === selectedModel)?.name}.
                 </p>
               </div>
             </div>

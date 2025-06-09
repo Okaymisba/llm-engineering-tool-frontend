@@ -9,12 +9,12 @@ export interface User {
   is_verified: boolean;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: () => void;
   verifyOTP: (email: string, otp: string) => Promise<void>;
   requestOTP: (email: string, username: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -39,7 +39,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -232,6 +231,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await supabase.auth.signOut();
     setToken(null);
     setUser(null);
+    // navigate('/auth');
   };
 
   const value: AuthContextType = {

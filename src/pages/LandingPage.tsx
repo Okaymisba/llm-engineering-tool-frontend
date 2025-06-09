@@ -1,9 +1,10 @@
 
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Brain, CreditCard, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { ModelsShowcase } from '@/components/ModelsShowcase';
 
 export const LandingPage: React.FC = () => {
   const { user } = useAuth();
@@ -47,7 +48,7 @@ export const LandingPage: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
-              onClick={() => navigate('/chat')} 
+              onClick={() => navigate('/auth')} 
               size="lg" 
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg px-8 py-3"
             >
@@ -67,27 +68,21 @@ export const LandingPage: React.FC = () => {
             Unlock the Power of AI
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
+            {/* Feature 1 - Updated icon */}
             <div className="text-center">
-              <svg className="mx-auto h-12 w-12 text-blue-600 mb-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 4.75 7.5 4.75a12.742 12.742 0 00-3.214 2.056l-2.286-2.286m4.714 12.808l1.517-1.518M12 6.253V4.75a2.25 2.25 0 012.25-2.25c.976 0 1.859.579 2.592 1.565l-2.548 2.554c-.147.147-.34.229-.544.229H14.25M12 6.253z"></path>
-              </svg>
+              <Brain className="mx-auto h-12 w-12 text-blue-600 mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Diverse AI Models</h3>
               <p className="text-gray-600">Access a wide range of AI models, each optimized for different tasks.</p>
             </div>
-            {/* Feature 2 */}
+            {/* Feature 2 - Updated icon */}
             <div className="text-center">
-              <svg className="mx-auto h-12 w-12 text-blue-600 mb-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h8.25a2.25 2.25 0 002.25-2.25V8.25A2.25 2.25 0 0013.5 6z"></path>
-              </svg>
+              <CreditCard className="mx-auto h-12 w-12 text-blue-600 mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Pay-As-You-Go Pricing</h3>
               <p className="text-gray-600">Only pay for what you use. No subscriptions, no hidden fees.</p>
             </div>
-            {/* Feature 3 */}
+            {/* Feature 3 - Updated icon */}
             <div className="text-center">
-              <svg className="mx-auto h-12 w-12 text-blue-600 mb-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
+              <Plug className="mx-auto h-12 w-12 text-blue-600 mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Easy Integration</h3>
               <p className="text-gray-600">Simple API makes it easy to integrate AI into your existing workflows.</p>
             </div>
@@ -129,6 +124,9 @@ export const LandingPage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Models Showcase */}
+      <ModelsShowcase />
 
       {/* Footer */}
       <footer className="border-t bg-white/80 backdrop-blur-sm">

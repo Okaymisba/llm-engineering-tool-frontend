@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { User as SupabaseUser } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface User {
-  id: number;
+  id: string;
   username: string;
   email: string;
   is_verified: boolean;
@@ -16,6 +17,7 @@ export interface AuthContextType {
   logout: () => void;
   verifyOTP: (email: string, otp: string) => Promise<void>;
   requestOTP: (email: string, username: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -35,59 +37,99 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  const API_BASE_URL = 'http://localhost:8000'; // Update this to your backend URL
-
   useEffect(() => {
-    if (token) {
-      fetchCurrentUser();
-    }
-  }, [token]);
-
-  const fetchCurrentUser = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session);
+      if (session?.user) {
+        await handleUserSession(session.user, session.access_token);
       } else {
-        logout();
+        setUser(null);
+        setToken(null);
       }
+    });
+
+    // THEN check for existing session
+    const getSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Error getting session:', error);
+        return;
+      }
+      if (session?.user) {
+        await handleUserSession(session.user, session.access_token);
+      }
+    };
+
+    getSession();
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleUserSession = async (supabaseUser: SupabaseUser, accessToken: string) => {
+    try {
+      // Get or create user profile
+      let { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .single();
+
+      if (error && error.code === 'PGRST116') {
+        // Profile doesn't exist, create it
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: supabaseUser.id,
+            username: supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || ''
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          return;
+        }
+        profile = newProfile;
+      } else if (error) {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+
+      const userData: User = {
+        id: supabaseUser.id,
+        username: profile?.username || supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || '',
+        email: supabaseUser.email || '',
+        is_verified: supabaseUser.email_confirmed_at !== null
+      };
+      
+      setUser(userData);
+      setToken(accessToken);
     } catch (error) {
-      console.error('Error fetching user:', error);
-      logout();
+      console.error('Error handling user session:', error);
     }
   };
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        const errorWithStatus = new Error(error.detail || 'Login failed');
-        (errorWithStatus as any).status = response.status;
-        console.log('Login error response:', { status: response.status, error: error.detail });
-        throw errorWithStatus;
+      if (error) {
+        if (error.message.includes('Email not confirmed')) {
+          const errorWithVerification = new Error('Please verify your email first');
+          (errorWithVerification as any).status = 403;
+          throw errorWithVerification;
+        }
+        throw new Error(error.message);
       }
 
-      const data = await response.json();
-      setToken(data.access_token);
-      localStorage.setItem('token', data.access_token);
+      // Session handling is done in onAuthStateChange
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -99,23 +141,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (username: string, email: string, password: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: username,
+          },
+          emailRedirectTo: `${window.location.origin}/`
         },
-        body: JSON.stringify({ username, email, password }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Registration failed');
+      if (error) {
+        throw new Error(error.message);
       }
 
-      const userData = await response.json();
-      console.log('User registered:', userData);
+      console.log('User registered successfully. Please check your email for verification.');
     } catch (error) {
       console.error('Registration error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    } catch (error) {
+      console.error('Google sign in error:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -125,13 +189,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const requestOTP = async (email: string, username: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/get-otp?email=${email}&username=${username}`, {
-        method: 'GET',
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to send OTP');
+      if (error) {
+        throw new Error(error.message);
       }
     } catch (error) {
       console.error('OTP request error:', error);
@@ -144,22 +208,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const verifyOTP = async (email: string, otp: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/verify-otp?email=${encodeURIComponent(email)}&otp=${otp}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'signup',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'OTP verification failed');
+      if (error) {
+        throw new Error(error.message);
       }
 
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.message || 'OTP verification failed');
-      }
+      // Session handling is done in onAuthStateChange
     } catch (error) {
       console.error('OTP verification error:', error);
       throw error;
@@ -168,10 +227,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setToken(null);
     setUser(null);
-    localStorage.removeItem('token');
+    // navigate('/auth');
   };
 
   const value: AuthContextType = {
@@ -182,6 +242,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     verifyOTP,
     requestOTP,
+    signInWithGoogle,
     isLoading,
   };
 

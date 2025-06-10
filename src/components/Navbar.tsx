@@ -49,8 +49,8 @@ export const Navbar: React.FC = () => {
             <span className="text-2xl font-bold text-gray-900">SwitchMinds</span>
           </div>
 
-          {/* Center - Model Selector (only on chat page) */}
-          {isChatPage && (
+          {/* Center - Model Selector (only on chat page and only if user is authenticated) */}
+          {isChatPage && user && (
             <div className="hidden md:block">
               <ModelSelector 
                 selectedModel={selectedModel}

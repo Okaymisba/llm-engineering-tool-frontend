@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,6 +8,8 @@ export interface User {
   username: string;
   email: string;
   is_verified: boolean;
+  first_name?: string;
+  last_name?: string;
 }
 
 interface AuthContextType {
@@ -38,7 +41,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -50,6 +53,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(null);
         setToken(null);
       }
+      setIsLoading(false);
     });
 
     // THEN check for existing session
@@ -57,10 +61,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error) {
         console.error('Error getting session:', error);
+        setIsLoading(false);
         return;
       }
       if (session?.user) {
         await handleUserSession(session.user, session.access_token);
+      } else {
+        setIsLoading(false);
       }
     };
 
@@ -84,7 +91,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .from('profiles')
           .insert({
             id: supabaseUser.id,
-            username: supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || ''
+            username: supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || '',
+            first_name: supabaseUser.user_metadata?.first_name || '',
+            last_name: supabaseUser.user_metadata?.last_name || ''
           })
           .select()
           .single();
@@ -103,7 +112,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         id: supabaseUser.id,
         username: profile?.username || supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || '',
         email: supabaseUser.email || '',
-        is_verified: supabaseUser.email_confirmed_at !== null
+        is_verified: supabaseUser.email_confirmed_at !== null,
+        first_name: profile?.first_name || supabaseUser.user_metadata?.first_name,
+        last_name: profile?.last_name || supabaseUser.user_metadata?.last_name
       };
       
       setUser(userData);

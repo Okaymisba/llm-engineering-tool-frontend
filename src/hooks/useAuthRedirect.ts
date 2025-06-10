@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,7 +8,8 @@ export const useAuthRedirect = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
+    // Only redirect to chat if user is on auth page and successfully logged in
+    if (user && window.location.pathname === '/auth') {
       navigate('/chat');
     }
   }, [user, navigate]);

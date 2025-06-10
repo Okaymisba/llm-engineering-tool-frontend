@@ -15,7 +15,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, token, isInitialized } = useAuth();
   const navigate = useNavigate();
 
-  // Show loading while authentication is being initialized
+  // Show loading only for a brief moment while checking auth
   if (!isInitialized) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
@@ -27,10 +27,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
+  // If no token or user, show auth page
   if (!token || !user) {
     return <AuthPage />;
   }
 
+  // If user exists but not verified, show verification message
   if (!user.is_verified) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -77,5 +79,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
+  // User is authenticated and verified, show protected content
   return <>{children}</>;
 };

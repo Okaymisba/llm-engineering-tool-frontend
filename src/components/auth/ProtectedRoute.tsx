@@ -3,7 +3,7 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthPage } from '@/pages/AuthPage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Sparkles } from 'lucide-react';
+import { Mail, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,8 +12,20 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, token } = useAuth();
+  const { user, token, isInitialized } = useAuth();
   const navigate = useNavigate();
+
+  // Show loading while authentication is being initialized
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!token || !user) {
     return <AuthPage />;
@@ -27,7 +39,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
           <div className="container mx-auto px-4 py-4 flex justify-between items-center">
             <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/')}>
               <Sparkles className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">AIHub</span>
+              <span className="text-2xl font-bold text-gray-900">SwitchMinds</span>
             </div>
             <Button variant="ghost" onClick={() => navigate('/auth')}>
               Complete Verification
@@ -43,7 +55,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
               </div>
               <CardTitle className="text-2xl font-bold text-gray-900">Email Verification Required</CardTitle>
               <CardDescription className="text-gray-600">
-                Please verify your email address to continue using AIHub and access all features.
+                Please verify your email address to continue using SwitchMinds and access all features.
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center space-y-4">

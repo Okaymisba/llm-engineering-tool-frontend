@@ -22,6 +22,7 @@ interface AuthContextType {
   requestOTP: (email: string, username: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   isLoading: boolean;
+  isInitialized: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,39 +42,61 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session);
+      
+      if (!mounted) return;
+
       if (session?.user) {
         await handleUserSession(session.user, session.access_token);
       } else {
         setUser(null);
         setToken(null);
       }
-      setIsLoading(false);
+      
+      if (!isInitialized) {
+        setIsInitialized(true);
+      }
     });
 
     // THEN check for existing session
-    const getSession = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('Error getting session:', error);
-        setIsLoading(false);
-        return;
-      }
-      if (session?.user) {
-        await handleUserSession(session.user, session.access_token);
-      } else {
-        setIsLoading(false);
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          setIsInitialized(true);
+          return;
+        }
+
+        if (mounted) {
+          if (session?.user) {
+            await handleUserSession(session.user, session.access_token);
+          }
+          setIsInitialized(true);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (mounted) {
+          setIsInitialized(true);
+        }
       }
     };
 
-    getSession();
+    initializeAuth();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleUserSession = async (supabaseUser: SupabaseUser, accessToken: string) => {
@@ -240,9 +263,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setToken(null);
-    setUser(null);
+    setIsLoading(true);
+    try {
+      await supabase.auth.signOut();
+      setToken(null);
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const value: AuthContextType = {
@@ -255,6 +285,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     requestOTP,
     signInWithGoogle,
     isLoading,
+    isInitialized,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

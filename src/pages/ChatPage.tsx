@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { FileUpload } from '@/components/chat/FileUpload';
-import { ModelSelector, fetchModels } from '@/components/chat/ModelSelector'; // Updated import
+import { ModelSelector, fetchModels } from '@/components/chat/ModelSelector';
+import { Model } from '@/types/model';
 
 interface Message {
   id: string;
@@ -522,3 +523,5 @@ export const ChatPage: React.FC = () => {
     </div>
   );
 };
+
+export default ChatPage;

@@ -3,8 +3,9 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthState } from '@/contexts/AuthStateContext';
+import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Sparkles, MessageSquare, LayoutDashboard, Key, Settings, User, History, LogOut } from 'lucide-react';
 import { ModelSelector } from '@/components/chat/ModelSelector';
 import {
@@ -17,6 +18,7 @@ import {
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
+  const { profile } = useProfile();
   const { setAuthState } = useAuthState();
   const navigate = useNavigate();
   const location = useLocation();
@@ -35,18 +37,22 @@ export const Navbar: React.FC = () => {
     navigate('/auth');
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   };
 
   return (
-    <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+    <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-10 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/')}>
             <Sparkles className="h-8 w-8 text-blue-600" />
-            <span className="text-2xl font-bold text-gray-900">SwitchMinds</span>
+            <span className="text-2xl font-bold text-foreground">SwitchMinds</span>
           </div>
 
           {/* Center - Model Selector (only on chat page and only if user is authenticated) */}
@@ -113,8 +119,11 @@ export const Navbar: React.FC = () => {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                       <Avatar className="h-10 w-10">
+                        <AvatarImage src={profile?.avatar_url} alt="Profile" />
                         <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm font-medium">
-                          {user.first_name?.charAt(0).toUpperCase() || user.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
+                          {profile?.first_name?.charAt(0).toUpperCase() || 
+                           profile?.username?.charAt(0).toUpperCase() || 
+                           user.email?.charAt(0).toUpperCase() || 'U'}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
@@ -123,9 +132,9 @@ export const Navbar: React.FC = () => {
                     <div className="flex items-center justify-start gap-2 p-2">
                       <div className="flex flex-col space-y-1 leading-none">
                         <p className="font-medium">
-                          {user.first_name && user.last_name 
-                            ? `${user.first_name} ${user.last_name}`
-                            : user.username
+                          {profile?.first_name && profile?.last_name 
+                            ? `${profile.first_name} ${profile.last_name}`
+                            : profile?.username || user.username
                           }
                         </p>
                         <p className="text-xs leading-none text-muted-foreground">

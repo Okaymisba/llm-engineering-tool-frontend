@@ -108,9 +108,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('Handling user session for:', supabaseUser.id);
       
       // Get or create user profile
-      let { data: profile, error } = await supabase
+      let { data: profile, error } = supabase
         .from('profiles')
-        .select('*')
+        .select('id,username,first_name,last_name')
         .eq('id', supabaseUser.id)
         .single();
 

@@ -1,16 +1,9 @@
+
 import React, { useEffect, useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-
-interface Model {
-  id: string;
-  name: string;
-  badge: string;
-  description: string;
-  provider: string;
-  isReasoning?: boolean;
-}
+import { Model } from '@/types/model';
 
 export const fetchModels = async (): Promise<Model[]> => {
   const { data, error } = await supabase.from('models').select('*');
@@ -34,12 +27,10 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModel, onM
       const fetchedModels = await fetchModels();
       setModels(fetchedModels);
 
-      // Set the default model if none is selected
+      // Set Gemini 2.0 as the default model if none is selected
       if (!selectedModel && fetchedModels.length > 0) {
-        const defaultModel = fetchedModels.find((model) => model.name === 'Gemini 2.0');
-        if (defaultModel) {
-          onModelChange(defaultModel.id);
-        }
+        const defaultModel = fetchedModels.find((model) => model.name === 'Gemini 2.0') || fetchedModels[0];
+        onModelChange(defaultModel.id);
       }
     };
 

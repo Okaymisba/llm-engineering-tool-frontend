@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,18 +8,21 @@ export interface User {
   username: string;
   email: string;
   is_verified: boolean;
+  first_name?: string;
+  last_name?: string;
 }
 
-export interface AuthContextType {
+interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   verifyOTP: (email: string, otp: string) => Promise<void>;
   requestOTP: (email: string, username: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   isLoading: boolean;
+  isInitialized: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,11 +43,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+
   useEffect(() => {
-    // Set up auth state listener FIRST
+    let mounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        console.log('Initializing auth...');
+        
+        // Get the current session
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+        }
+
+        if (mounted) {
+          if (session?.user) {
+            console.log('Found existing session, setting user');
+            await handleUserSession(session.user, session.access_token);
+          } else {
+            console.log('No existing session found');
+          }
+          setIsInitialized(true);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (mounted) {
+          setIsInitialized(true);
+        }
+      }
+    };
+
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session);
-      if (session?.user) {
+      console.log('Auth state changed:', event, session?.user?.id);
+      
+      if (!mounted) return;
+
+      if (event === 'SIGNED_OUT') {
+        console.log('User signed out, clearing state');
+        setUser(null);
+        setToken(null);
+      } else if (session?.user) {
         await handleUserSession(session.user, session.access_token);
       } else {
         setUser(null);
@@ -51,39 +94,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     });
 
-    // THEN check for existing session
-    const getSession = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('Error getting session:', error);
-        return;
-      }
-      if (session?.user) {
-        await handleUserSession(session.user, session.access_token);
-      }
+    // Initialize auth
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
     };
-
-    getSession();
-
-    return () => subscription.unsubscribe();
   }, []);
 
   const handleUserSession = async (supabaseUser: SupabaseUser, accessToken: string) => {
     try {
+      console.log('Handling user session for:', supabaseUser.id);
+      
       // Get or create user profile
-      let { data: profile, error } = await supabase
+      let { data: profile, error } = supabase
         .from('profiles')
-        .select('*')
+        .select('id,username,first_name,last_name')
         .eq('id', supabaseUser.id)
         .single();
 
       if (error && error.code === 'PGRST116') {
         // Profile doesn't exist, create it
+        console.log('Creating new profile for user');
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
           .insert({
             id: supabaseUser.id,
-            username: supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || ''
+            username: supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || '',
+            first_name: supabaseUser.user_metadata?.first_name || '',
+            last_name: supabaseUser.user_metadata?.last_name || ''
           })
           .select()
           .single();
@@ -102,9 +142,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         id: supabaseUser.id,
         username: profile?.username || supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || '',
         email: supabaseUser.email || '',
-        is_verified: supabaseUser.email_confirmed_at !== null
+        is_verified: supabaseUser.email_confirmed_at !== null,
+        first_name: profile?.first_name || supabaseUser.user_metadata?.first_name,
+        last_name: profile?.last_name || supabaseUser.user_metadata?.last_name
       };
       
+      console.log('Setting user data:', userData);
       setUser(userData);
       setToken(accessToken);
     } catch (error) {
@@ -128,8 +171,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         throw new Error(error.message);
       }
-
-      // Session handling is done in onAuthStateChange
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -217,8 +258,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error) {
         throw new Error(error.message);
       }
-
-      // Session handling is done in onAuthStateChange
     } catch (error) {
       console.error('OTP verification error:', error);
       throw error;
@@ -228,10 +267,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setToken(null);
-    setUser(null);
-    // navigate('/auth');
+    setIsLoading(true);
+    try {
+      console.log('Logging out user...');
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Error during logout:', error);
+        throw error;
+      }
+      
+      // Clear local state immediately
+      setUser(null);
+      setToken(null);
+      
+      // Clear any remaining local storage items
+      localStorage.removeItem('supabase.auth.token');
+      
+      console.log('Logout successful');
+      
+      // Navigate to home page
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const value: AuthContextType = {
@@ -244,6 +307,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     requestOTP,
     signInWithGoogle,
     isLoading,
+    isInitialized,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

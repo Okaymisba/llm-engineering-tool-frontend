@@ -326,8 +326,8 @@ export const ApiKeysPage: React.FC = () => {
             <Label className="text-sm font-medium">Usage</Label>
             <div className="space-y-2 mt-1">
               <div className="flex justify-between text-sm">
-                <span>{key.tokens_used.toLocaleString()}</span>
-                <span>{key.token_limit_per_day.toLocaleString()}</span>
+                <span>{(key.tokens_used ?? 0).toLocaleString()}</span>
+                <span>{(key.token_limit_per_day ?? 0).toLocaleString()}</span>
               </div>
               <Progress value={usagePercentage} className="h-2" />
               <div className="text-xs text-muted-foreground">
@@ -525,7 +525,7 @@ export const ApiKeysPage: React.FC = () => {
                       </TableHeader>
                       <TableBody>
                         {apiKeys.map((key) => {
-                          const usagePercentage = getUsagePercentage(key.tokens_used, key.token_limit_per_day);
+                          const usagePercentage = getUsagePercentage(key.tokens_used ?? 0, key.token_limit_per_day ?? 0);
                           return (
                             <TableRow key={key.id}>
                               <TableCell>
@@ -566,8 +566,8 @@ export const ApiKeysPage: React.FC = () => {
                               <TableCell>
                                 <div className="space-y-1">
                                   <div className="flex justify-between text-sm">
-                                    <span>{key.tokens_used.toLocaleString()}</span>
-                                    <span>{key.token_limit_per_day.toLocaleString()}</span>
+                                    <span>{(key.tokens_used ?? 0).toLocaleString()}</span>
+                                    <span>{(key.token_limit_per_day ?? 0).toLocaleString()}</span>
                                   </div>
                                   <Progress
                                     value={usagePercentage}

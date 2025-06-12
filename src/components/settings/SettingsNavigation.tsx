@@ -2,8 +2,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { User, Settings, CreditCard, Key, Moon, Sun, Menu, X } from 'lucide-react';
-import { useTheme } from '@/contexts/ThemeContext';
+import { User, Settings, Key, Menu, History } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Sheet,
@@ -16,14 +15,13 @@ import {
 export const SettingsNavigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { theme, toggleTheme } = useTheme();
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
 
   const navigationItems = [
+    { path: '/chat', label: 'Chat History (Coming Soon)', icon: History },
     { path: '/settings', label: 'Settings', icon: Settings },
     { path: '/profile', label: 'Profile', icon: User },
-    { path: '/credits', label: 'Credits', icon: CreditCard },
     { path: '/api-keys', label: 'API Keys', icon: Key },
   ];
 
@@ -54,17 +52,6 @@ export const SettingsNavigation: React.FC = () => {
           </Button>
         );
       })}
-      
-      <div className="pt-4 border-t border-border">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3 text-foreground hover:bg-muted"
-          onClick={toggleTheme}
-        >
-          {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-          {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-        </Button>
-      </div>
     </>
   );
 

@@ -6,8 +6,10 @@ import { useAuthState } from '@/contexts/AuthStateContext';
 import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, LayoutDashboard, Key, Settings, User, History, LogOut } from 'lucide-react';
+import { MessageSquare, LayoutDashboard, Key, Settings, User, History, LogOut, Menu, CreditCard, Moon, Sun } from 'lucide-react';
 import { ModelSelector } from '@/components/chat/ModelSelector';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,17 +17,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const { profile } = useProfile();
   const { setAuthState } = useAuthState();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useIsMobile();
   const isChatPage = location.pathname === '/chat';
   const isAuthPage = location.pathname === '/auth';
   const isLandingPage = location.pathname === '/';
   const [selectedModel, setSelectedModel] = React.useState('gemini-2.0-flash');
+  const [isNavOpen, setIsNavOpen] = React.useState(false);
 
   const handleLoginClick = () => {
     setAuthState('login');
@@ -45,19 +57,64 @@ export const Navbar: React.FC = () => {
     }
   };
 
+  const handleNavigation = (path: string) => {
+    navigate(path);
+    setIsNavOpen(false);
+  };
+
+  const NavigationContent = () => (
+    <div className="space-y-2">
+      <h2 className="text-lg font-semibold mb-4 text-foreground">Navigation</h2>
+      
+      <Button
+        variant="ghost"
+        className="w-full justify-start gap-3 text-foreground hover:bg-muted"
+        onClick={() => handleNavigation('/chat')}
+      >
+        <History className="h-4 w-4" />
+        Chat History (Coming Soon)
+      </Button>
+      
+      <Button
+        variant="ghost"
+        className="w-full justify-start gap-3 text-foreground hover:bg-muted"
+        onClick={() => handleNavigation('/settings')}
+      >
+        <Settings className="h-4 w-4" />
+        Settings
+      </Button>
+    </div>
+  );
+
   return (
     <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="mx-auto px-4 sm:px-6 lg:px-10 py-4">
         <div className="flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/')}>
-            <img 
-              src="/lovable-uploads/c8883599-53d7-47be-aa05-ca398cdd577f.png" 
-              alt="SwitchMinds" 
-              className="h-8 w-8"
-            />
-            <span className="text-xl sm:text-2xl font-bold text-foreground">SwitchMinds</span>
-          </div>
+          {/* Logo or Navigation Button */}
+          {isMobile && !isLandingPage && user ? (
+            <Sheet open={isNavOpen} onOpenChange={setIsNavOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Menu className="h-4 w-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64 p-4">
+                <SheetHeader>
+                  <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+                </SheetHeader>
+                <NavigationContent />
+              </SheetContent>
+            </Sheet>
+          ) : (
+            <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/')}>
+              <img 
+                src="/lovable-uploads/c8883599-53d7-47be-aa05-ca398cdd577f.png" 
+                alt="SwitchMinds" 
+                className="h-8 w-8"
+              />
+              <span className="text-xl sm:text-2xl font-bold text-foreground">SwitchMinds</span>
+            </div>
+          )}
 
           {/* Center - Model Selector (only on chat page and only if user is authenticated) */}
           {isChatPage && user && (
@@ -163,9 +220,13 @@ export const Navbar: React.FC = () => {
                       <Key className="mr-2 h-4 w-4" />
                       <span>API Keys</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/settings')}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
+                    <DropdownMenuItem onClick={() => navigate('/credits')}>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      <span>Credits</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={toggleTheme}>
+                      {theme === 'light' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
+                      <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout}>

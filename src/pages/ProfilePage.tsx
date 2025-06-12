@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useProfile } from '@/hooks/useProfile';
-import { SettingsNavigation } from '@/components/settings/SettingsNavigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Camera, Github, Mail, Trash2, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -101,13 +100,10 @@ export const ProfilePage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="flex">
-          {!isMobile && <SettingsNavigation />}
-          <div className="flex-1 p-4 lg:p-8">
-            {isMobile && <SettingsNavigation />}
-            <div className="animate-pulse">Loading...</div>
-          </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -115,10 +111,8 @@ export const ProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex">
-        {!isMobile && <SettingsNavigation />}
-        <div className={`flex-1 p-4 lg:p-8 ${isMobile ? 'pt-16' : ''} max-w-4xl`}>
-          {isMobile && <SettingsNavigation />}
+      <div className="flex w-full">
+        <div className={`flex-1 p-4 lg:p-8`}>
           <div className="space-y-6">
             <div>
               <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Profile</h1>

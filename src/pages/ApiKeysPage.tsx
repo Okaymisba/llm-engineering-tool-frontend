@@ -373,7 +373,6 @@ export const ApiKeysPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="flex w-full">
-        <SettingsNavigation />
         
         <div className="flex-1 p-4 lg:p-8">
           {/* Header */}

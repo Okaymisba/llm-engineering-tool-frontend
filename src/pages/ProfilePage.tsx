@@ -113,30 +113,30 @@ export const ProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex">
+      <div className="flex flex-col md:flex-row">
         <SettingsNavigation />
-        <div className="flex-1 p-8 max-w-4xl">
+        <div className="flex-1 p-4 md:p-8 max-w-full md:max-w-4xl">
           <div className="space-y-6">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Profile</h1>
-              <p className="text-muted-foreground">Manage your account information and connected services.</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Profile</h1>
+              <p className="text-sm md:text-base text-muted-foreground">Manage your account information and connected services.</p>
             </div>
 
             {/* Profile Information Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-lg md:text-xl">Profile Information</CardTitle>
+                <CardDescription className="text-sm md:text-base">
                   Update your personal information and profile picture.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Avatar Section */}
-                <div className="flex items-center gap-6">
+                <div className="flex flex-col sm:flex-row items-center gap-4 md:gap-6">
                   <div className="relative">
-                    <Avatar className="h-24 w-24">
+                    <Avatar className="h-20 w-20 md:h-24 md:w-24">
                       <AvatarImage src={profile?.avatar_url} />
-                      <AvatarFallback className="text-2xl bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                      <AvatarFallback className="text-xl md:text-2xl bg-gradient-to-br from-blue-500 to-purple-600 text-white">
                         {profile?.first_name?.charAt(0) || profile?.username?.charAt(0) || 'U'}
                       </AvatarFallback>
                     </Avatar>
@@ -155,7 +155,7 @@ export const ProfilePage: React.FC = () => {
                       onChange={handleAvatarUpload}
                     />
                   </div>
-                  <div>
+                  <div className="text-center sm:text-left">
                     <h3 className="font-medium text-foreground">Profile Picture</h3>
                     <p className="text-sm text-muted-foreground">
                       Click the camera icon to upload a new picture. Recommended size: 1:1 ratio.
@@ -206,7 +206,7 @@ export const ProfilePage: React.FC = () => {
                   </div>
                 </div>
 
-                <Button onClick={handleUpdateProfile} disabled={isUpdating}>
+                <Button onClick={handleUpdateProfile} disabled={isUpdating} className="w-full sm:w-auto">
                   {isUpdating ? 'Updating...' : 'Update Profile'}
                 </Button>
               </CardContent>
@@ -215,24 +215,24 @@ export const ProfilePage: React.FC = () => {
             {/* Connected Accounts Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Connected Accounts</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-lg md:text-xl">Connected Accounts</CardTitle>
+                <CardDescription className="text-sm md:text-base">
                   Manage your connected social accounts for easier sign-in.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-border rounded-lg gap-3">
                   <div className="flex items-center gap-3">
                     <Mail className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="font-medium text-foreground">Email</p>
-                      <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                      <p className="text-sm text-muted-foreground break-all">{profile?.email}</p>
                     </div>
                   </div>
                   <Badge variant="secondary">Primary</Badge>
                 </div>
 
-                <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-border rounded-lg gap-3">
                   <div className="flex items-center gap-3">
                     <div className="p-1 bg-black rounded">
                       <Github className="h-4 w-4 text-white" />

@@ -378,17 +378,6 @@ export const ApiKeysPage: React.FC = () => {
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
-              {!isMobile && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate('/dashboard')}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Dashboard
-                </Button>
-              )}
               <div>
                 <h1 className="text-2xl lg:text-3xl font-bold">API Keys</h1>
                 <p className="text-muted-foreground mt-1">Manage your API keys and monitor usage</p>

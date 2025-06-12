@@ -326,8 +326,8 @@ export const ApiKeysPage: React.FC = () => {
             <Label className="text-sm font-medium">Usage</Label>
             <div className="space-y-2 mt-1">
               <div className="flex justify-between text-sm">
-                <span>{key.tokens_used.toLocaleString()}</span>
-                <span>{key.token_limit_per_day.toLocaleString()}</span>
+                <span>{(key.tokens_used ?? 0).toLocaleString()}</span>
+                <span>{(key.token_limit_per_day ?? 0).toLocaleString()}</span>
               </div>
               <Progress value={usagePercentage} className="h-2" />
               <div className="text-xs text-muted-foreground">
@@ -378,17 +378,6 @@ export const ApiKeysPage: React.FC = () => {
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
-              {!isMobile && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate('/dashboard')}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Dashboard
-                </Button>
-              )}
               <div>
                 <h1 className="text-2xl lg:text-3xl font-bold">API Keys</h1>
                 <p className="text-muted-foreground mt-1">Manage your API keys and monitor usage</p>
@@ -525,7 +514,7 @@ export const ApiKeysPage: React.FC = () => {
                       </TableHeader>
                       <TableBody>
                         {apiKeys.map((key) => {
-                          const usagePercentage = getUsagePercentage(key.tokens_used, key.token_limit_per_day);
+                          const usagePercentage = getUsagePercentage(key.tokens_used ?? 0, key.token_limit_per_day ?? 0);
                           return (
                             <TableRow key={key.id}>
                               <TableCell>
@@ -566,8 +555,8 @@ export const ApiKeysPage: React.FC = () => {
                               <TableCell>
                                 <div className="space-y-1">
                                   <div className="flex justify-between text-sm">
-                                    <span>{key.tokens_used.toLocaleString()}</span>
-                                    <span>{key.token_limit_per_day.toLocaleString()}</span>
+                                    <span>{(key.tokens_used ?? 0).toLocaleString()}</span>
+                                    <span>{(key.token_limit_per_day ?? 0).toLocaleString()}</span>
                                   </div>
                                   <Progress
                                     value={usagePercentage}

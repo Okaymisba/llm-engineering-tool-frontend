@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useProfile } from '@/hooks/useProfile';
-import { SettingsNavigation } from '@/components/settings/SettingsNavigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Camera, Github, Mail, Trash2, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export const ProfilePage: React.FC = () => {
   const { user } = useAuth();
@@ -19,6 +18,7 @@ export const ProfilePage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   const [formData, setFormData] = useState({
     first_name: '',
@@ -100,12 +100,10 @@ export const ProfilePage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="flex">
-          <SettingsNavigation />
-          <div className="flex-1 p-8">
-            <div className="animate-pulse">Loading...</div>
-          </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -113,30 +111,29 @@ export const ProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex">
-        <SettingsNavigation />
-        <div className="flex-1 p-8 max-w-4xl">
+      <div className="flex w-full">
+        <div className={`flex-1 p-4 lg:p-8`}>
           <div className="space-y-6">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Profile</h1>
-              <p className="text-muted-foreground">Manage your account information and connected services.</p>
+              <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Profile</h1>
+              <p className="text-muted-foreground text-sm lg:text-base">Manage your account information and connected services.</p>
             </div>
 
             {/* Profile Information Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-lg lg:text-xl">Profile Information</CardTitle>
+                <CardDescription className="text-sm lg:text-base">
                   Update your personal information and profile picture.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Avatar Section */}
-                <div className="flex items-center gap-6">
+                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
                   <div className="relative">
-                    <Avatar className="h-24 w-24">
+                    <Avatar className="h-20 w-20 lg:h-24 lg:w-24">
                       <AvatarImage src={profile?.avatar_url} />
-                      <AvatarFallback className="text-2xl bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                      <AvatarFallback className="text-xl lg:text-2xl bg-gradient-to-br from-blue-500 to-purple-600 text-white">
                         {profile?.first_name?.charAt(0) || profile?.username?.charAt(0) || 'U'}
                       </AvatarFallback>
                     </Avatar>
@@ -155,7 +152,7 @@ export const ProfilePage: React.FC = () => {
                       onChange={handleAvatarUpload}
                     />
                   </div>
-                  <div>
+                  <div className="text-center sm:text-left">
                     <h3 className="font-medium text-foreground">Profile Picture</h3>
                     <p className="text-sm text-muted-foreground">
                       Click the camera icon to upload a new picture. Recommended size: 1:1 ratio.
@@ -164,7 +161,7 @@ export const ProfilePage: React.FC = () => {
                 </div>
 
                 {/* Form Fields */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="first_name">First Name</Label>
                     <Input
@@ -206,7 +203,11 @@ export const ProfilePage: React.FC = () => {
                   </div>
                 </div>
 
-                <Button onClick={handleUpdateProfile} disabled={isUpdating}>
+                <Button 
+                  onClick={handleUpdateProfile} 
+                  disabled={isUpdating}
+                  className="w-full sm:w-auto"
+                >
                   {isUpdating ? 'Updating...' : 'Update Profile'}
                 </Button>
               </CardContent>
@@ -215,24 +216,24 @@ export const ProfilePage: React.FC = () => {
             {/* Connected Accounts Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Connected Accounts</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-lg lg:text-xl">Connected Accounts</CardTitle>
+                <CardDescription className="text-sm lg:text-base">
                   Manage your connected social accounts for easier sign-in.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-border rounded-lg gap-3 sm:gap-0">
                   <div className="flex items-center gap-3">
                     <Mail className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="font-medium text-foreground">Email</p>
-                      <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                      <p className="text-sm text-muted-foreground break-all">{profile?.email}</p>
                     </div>
                   </div>
                   <Badge variant="secondary">Primary</Badge>
                 </div>
 
-                <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-border rounded-lg gap-3 sm:gap-0">
                   <div className="flex items-center gap-3">
                     <div className="p-1 bg-black rounded">
                       <Github className="h-4 w-4 text-white" />
@@ -242,7 +243,7 @@ export const ProfilePage: React.FC = () => {
                       <p className="text-sm text-muted-foreground">Not connected</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto">
                     Connect
                   </Button>
                 </div>

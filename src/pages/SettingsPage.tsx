@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Lock, Bell, Cpu, ExternalLink } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export const SettingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -21,6 +21,7 @@ export const SettingsPage: React.FC = () => {
   const { models } = useModels();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -105,12 +106,10 @@ export const SettingsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="flex">
-          <SettingsNavigation />
-          <div className="flex-1 p-8">
-            <div className="animate-pulse">Loading...</div>
-          </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -120,23 +119,22 @@ export const SettingsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex">
-        <SettingsNavigation />
-        <div className="flex-1 p-8 max-w-4xl">
+      <div className="flex w-full">
+        <div className={`flex-1 p-4 lg:p-8`}>
           <div className="space-y-6">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Settings</h1>
-              <p className="text-muted-foreground">Manage your account preferences and security settings.</p>
+              <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Settings</h1>
+              <p className="text-muted-foreground text-sm lg:text-base">Manage your account preferences and security settings.</p>
             </div>
 
             {/* Password Settings */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-lg lg:text-xl">
                   <Lock className="h-5 w-5" />
                   Password & Security
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-sm lg:text-base">
                   Update your password and security preferences.
                 </CardDescription>
               </CardHeader>
@@ -176,6 +174,7 @@ export const SettingsPage: React.FC = () => {
                 <Button 
                   onClick={handlePasswordChange} 
                   disabled={isUpdatingPassword || !passwordData.newPassword}
+                  className="w-full sm:w-auto"
                 >
                   {isUpdatingPassword ? 'Updating...' : 'Update Password'}
                 </Button>
@@ -185,16 +184,16 @@ export const SettingsPage: React.FC = () => {
             {/* Notification Settings */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-lg lg:text-xl">
                   <Bell className="h-5 w-5" />
                   Notifications
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-sm lg:text-base">
                   Configure your notification preferences.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
                   <div>
                     <p className="font-medium text-foreground">Low Balance Notifications</p>
                     <p className="text-sm text-muted-foreground">
@@ -212,11 +211,11 @@ export const SettingsPage: React.FC = () => {
             {/* Default Model Settings */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-lg lg:text-xl">
                   <Cpu className="h-5 w-5" />
                   Default Model
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-sm lg:text-base">
                   Apps will use this model by default, but they may override it if they choose to do so. 
                   This model will also be used as your default fallback model.
                 </CardDescription>
@@ -258,7 +257,7 @@ export const SettingsPage: React.FC = () => {
                 
                 {selectedModel && (
                   <div className="p-4 bg-muted rounded-lg">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
                       <div>
                         <h4 className="font-medium text-foreground">{selectedModel.name}</h4>
                         <p className="text-sm text-muted-foreground">

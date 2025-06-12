@@ -2,13 +2,23 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { User, Settings, CreditCard, Key, Moon, Sun } from 'lucide-react';
+import { User, Settings, CreditCard, Key, Moon, Sun, Menu, X } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useIsMobile } from '@/hooks/use-mobile';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 export const SettingsNavigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
+  const isMobile = useIsMobile();
+  const [isOpen, setIsOpen] = React.useState(false);
 
   const navigationItems = [
     { path: '/settings', label: 'Settings', icon: Settings },
@@ -17,8 +27,13 @@ export const SettingsNavigation: React.FC = () => {
     { path: '/api-keys', label: 'API Keys', icon: Key },
   ];
 
-  return (
-    <div className="w-64 bg-background border-r border-border min-h-screen p-4 space-y-2">
+  const handleNavigation = (path: string) => {
+    navigate(path);
+    setIsOpen(false);
+  };
+
+  const NavigationContent = () => (
+    <>
       <h2 className="text-lg font-semibold mb-4 text-foreground">Account Settings</h2>
       
       {navigationItems.map((item) => {
@@ -32,7 +47,7 @@ export const SettingsNavigation: React.FC = () => {
             className={`w-full justify-start gap-3 ${
               isActive ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'
             }`}
-            onClick={() => navigate(item.path)}
+            onClick={() => handleNavigation(item.path)}
           >
             <Icon className="h-4 w-4" />
             {item.label}
@@ -50,6 +65,30 @@ export const SettingsNavigation: React.FC = () => {
           {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
         </Button>
       </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetTrigger asChild>
+          <Button variant="outline" size="sm" className="fixed top-20 left-4 z-50 lg:hidden">
+            <Menu className="h-4 w-4" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-64 p-4 space-y-2">
+          <SheetHeader>
+            <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+          </SheetHeader>
+          <NavigationContent />
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return (
+    <div className="w-64 bg-background border-r border-border min-h-screen p-4 space-y-2">
+      <NavigationContent />
     </div>
   );
 };

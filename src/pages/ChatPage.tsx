@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { FileUpload } from '@/components/chat/FileUpload';
-import { ModelSelector, fetchModels } from '@/components/chat/ModelSelector';
+import { fetchModels } from '@/components/chat/ModelSelector';
+import { ResponsiveModelSelector } from '@/components/chat/ResponsiveModelSelector';
 import { Model } from '@/types/model';
 import { WebSearchToggle } from '@/components/chat/WebSearchToggle';
 
@@ -518,127 +519,123 @@ export const ChatPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 flex flex-col font-sans">
-
-      {/* Chat Container */}
-      <div className="flex-1 w-full max-w-4xl mx-auto px-4 flex flex-col relative">
-        {/* Header with Model Selector */}
-        <div className="py-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-          <ModelSelector 
-            selectedModel={selectedModel}
-            onModelChange={setSelectedModel}
-            loading={modelsLoading}
-          />
-        </div>
-
-        {/* Messages Area */}
-        <div 
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto py-6 space-y-4"
-          style={{ minHeight: 0 }}
-        >
-          {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full min-h-[400px]">
-              <div className="text-center max-w-md">
-                <Sparkles className="h-12 w-12 text-green-600 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">How can I help you today?</h3>
-                <p className="text-gray-600">
-                  Start a conversation with {availableModels.find(m => m.id === selectedModel)?.name || 'AI'}.
-                </p>
-              </div>
-            </div>
-          ) : (
-            messages.map((message) => (
-              <ChatMessage 
-                key={message.id} 
-                message={message} 
-                username={user?.username} 
-              />
-            ))
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Scroll to Bottom Button */}
-        {showScrollToBottom && (
-          <Button
-            onClick={() => scrollToBottom()}
-            className="fixed bottom-24 right-8 h-10 w-10 rounded-full bg-white border shadow-lg hover:shadow-xl z-10"
-            size="icon"
-            variant="outline"
+    <ResponsiveModelSelector
+      selectedModel={selectedModel}
+      onModelChange={setSelectedModel}
+      loading={modelsLoading}
+    >
+      <div className="min-h-screen w-full bg-gray-50 flex flex-col font-sans">
+        {/* Chat Container */}
+        <div className="flex-1 w-full max-w-4xl mx-auto px-4 flex flex-col relative">
+          {/* Messages Area */}
+          <div 
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto py-6 space-y-4"
+            style={{ minHeight: 0 }}
           >
-            <ArrowDown className="h-4 w-4" />
-          </Button>
-        )}
-
-        {/* Cancel Button during streaming */}
-        {isLoading && (
-          <div className="flex justify-center py-4">
-            <Button
-              onClick={handleCancelRequest}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
-            >
-              <X className="h-4 w-4" />
-              Stop generating
-            </Button>
-          </div>
-        )}
-
-        {/* Input Area */}
-        <div className="py-4 sticky bottom-0 bg-gray-50">
-          <div className="bg-white rounded-xl border shadow-sm p-3">
-            <div className="flex items-end gap-3">
-              <FileUpload 
-                uploadedFiles={uploadedFiles}
-                setUploadedFiles={setUploadedFiles}
-                isLoading={isLoading}
-                onFileAdded={handleFileAdded}
-              />
-              
-              <WebSearchToggle
-                enabled={webSearchEnabled}
-                onToggle={setWebSearchEnabled}
-                disabled={isLoading}
-              />
-              
-              <div className="flex-1 min-w-0 relative">
-                <Textarea
-                  ref={inputRef}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  placeholder="Message Syncmind..."
-                  className="min-h-[24px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base"
-                  disabled={isLoading}
-                  rows={1}
-                  style={{ 
-                    height: 'auto',
-                    lineHeight: '1.5'
-                  }}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
-                  }}
-                />
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full min-h-[400px]">
+                <div className="text-center max-w-md">
+                  <Sparkles className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">How can I help you today?</h3>
+                  <p className="text-gray-600">
+                    Start a conversation with {availableModels.find(m => m.id === selectedModel)?.name || 'AI'}.
+                  </p>
+                </div>
               </div>
-              
+            ) : (
+              messages.map((message) => (
+                <ChatMessage 
+                  key={message.id} 
+                  message={message} 
+                  username={user?.username} 
+                />
+              ))
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Scroll to Bottom Button */}
+          {showScrollToBottom && (
+            <Button
+              onClick={() => scrollToBottom()}
+              className="fixed bottom-24 right-8 h-10 w-10 rounded-full bg-white border shadow-lg hover:shadow-xl z-10"
+              size="icon"
+              variant="outline"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </Button>
+          )}
+
+          {/* Cancel Button during streaming */}
+          {isLoading && (
+            <div className="flex justify-center py-4">
               <Button
-                onClick={handleSendMessage}
-                disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading}
-                size="icon"
-                className="h-8 w-8 bg-gray-900 hover:bg-gray-800 rounded-lg shrink-0"
+                onClick={handleCancelRequest}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
               >
-                <Send className="h-4 w-4" />
+                <X className="h-4 w-4" />
+                Stop generating
               </Button>
+            </div>
+          )}
+
+          {/* Input Area */}
+          <div className="py-4 sticky bottom-0 bg-gray-50">
+            <div className="bg-white rounded-xl border shadow-sm p-3">
+              <div className="flex items-end gap-3">
+                <FileUpload 
+                  uploadedFiles={uploadedFiles}
+                  setUploadedFiles={setUploadedFiles}
+                  isLoading={isLoading}
+                  onFileAdded={handleFileAdded}
+                />
+                
+                <WebSearchToggle
+                  enabled={webSearchEnabled}
+                  onToggle={setWebSearchEnabled}
+                  disabled={isLoading}
+                />
+                
+                <div className="flex-1 min-w-0 relative">
+                  <Textarea
+                    ref={inputRef}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    placeholder="Message Syncmind..."
+                    className="min-h-[24px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base"
+                    disabled={isLoading}
+                    rows={1}
+                    style={{ 
+                      height: 'auto',
+                      lineHeight: '1.5'
+                    }}
+                    onInput={(e) => {
+                      const target = e.target as HTMLTextAreaElement;
+                      target.style.height = 'auto';
+                      target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+                    }}
+                  />
+                </div>
+                
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading}
+                  size="icon"
+                  className="h-8 w-8 bg-gray-900 hover:bg-gray-800 rounded-lg shrink-0"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </ResponsiveModelSelector>
   );
 };
 

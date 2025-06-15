@@ -56,36 +56,61 @@ export type Database = {
       }
       chats: {
         Row: {
+          answer: string | null
+          belongs_to: string
           created_at: string | null
+          document: string | null
           id: string
+          image: string | null
           input_tokens: number
           latency_ms: number | null
-          model_name: string
+          model: string
           output_tokens: number
+          question: string
           session_id: string | null
           status: number
+          total_tokens: number
         }
         Insert: {
+          answer?: string | null
+          belongs_to: string
           created_at?: string | null
+          document?: string | null
           id?: string
+          image?: string | null
           input_tokens: number
           latency_ms?: number | null
-          model_name: string
+          model: string
           output_tokens: number
+          question: string
           session_id?: string | null
           status: number
+          total_tokens: number
         }
         Update: {
+          answer?: string | null
+          belongs_to?: string
           created_at?: string | null
+          document?: string | null
           id?: string
+          image?: string | null
           input_tokens?: number
           latency_ms?: number | null
-          model_name?: string
+          model?: string
           output_tokens?: number
+          question?: string
           session_id?: string | null
           status?: number
+          total_tokens?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "chats_belongs_to_fkey"
+            columns: ["belongs_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "chats_session_id_fkey"
             columns: ["session_id"]
@@ -99,29 +124,35 @@ export type Database = {
         Row: {
           api_id: string | null
           created_at: string
+          file_url: string
           filename: string
           hits: number | null
           id: string
           last_used: string | null
           size: number
+          status: string
         }
         Insert: {
           api_id?: string | null
           created_at?: string
+          file_url: string
           filename: string
           hits?: number | null
           id?: string
           last_used?: string | null
           size: number
+          status?: string
         }
         Update: {
           api_id?: string | null
           created_at?: string
+          file_url?: string
           filename?: string
           hits?: number | null
           id?: string
           last_used?: string | null
           size?: number
+          status?: string
         }
         Relationships: [
           {
@@ -135,21 +166,18 @@ export type Database = {
       }
       embeddings: {
         Row: {
-          chunk_text: string | null
           created_at: string | null
           document_id: string | null
           embedding: string | null
           id: string
         }
         Insert: {
-          chunk_text?: string | null
           created_at?: string | null
           document_id?: string | null
           embedding?: string | null
           id?: string
         }
         Update: {
-          chunk_text?: string | null
           created_at?: string | null
           document_id?: string | null
           embedding?: string | null

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Settings, LogOut, History, X, ArrowDown, User, UserCheck2Icon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -352,7 +353,11 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
             buffer = remaining;
             
             for (const parsedChunk of parsed) {
+              console.log('Received chunk:', parsedChunk);
+              
               if (parsedChunk.type === 'web_search') {
+                console.log('Web search chunk data:', parsedChunk.data);
+                
                 if (typeof parsedChunk.data === 'string') {
                   // Still searching
                   setMessages(prev => 
@@ -363,14 +368,28 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
                     )
                   );
                 } else {
-                  // Search results received
+                  // Search results received - extract from nested array structure
+                  let searchResults = [];
+                  
+                  if (Array.isArray(parsedChunk.data) && parsedChunk.data.length > 0) {
+                    // Handle nested array structure: data: [[{results}]]
+                    if (Array.isArray(parsedChunk.data[0])) {
+                      searchResults = parsedChunk.data[0];
+                    } else {
+                      // Handle flat array structure: data: [{results}]
+                      searchResults = parsedChunk.data;
+                    }
+                  }
+                  
+                  console.log('Processed search results:', searchResults);
+                  
                   setMessages(prev => 
                     prev.map(msg => 
                       msg.id === aiMessageId 
                         ? { 
                             ...msg, 
                             isSearching: false, 
-                            webSearchResults: Array.isArray(parsedChunk.data) ? parsedChunk.data : [parsedChunk.data]
+                            webSearchResults: searchResults
                           }
                         : msg
                     )

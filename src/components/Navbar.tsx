@@ -7,7 +7,6 @@ import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MessageSquare, LayoutDashboard, Key, Settings, User, History, LogOut, Menu, CreditCard, Moon, Sun } from 'lucide-react';
-import { ModelSelector } from '@/components/chat/ModelSelector';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
@@ -36,7 +35,6 @@ export const Navbar: React.FC = () => {
   const isChatPage = location.pathname === '/chat';
   const isAuthPage = location.pathname === '/auth';
   const isLandingPage = location.pathname === '/';
-  const [selectedModel, setSelectedModel] = React.useState('gemini-2.0-flash');
   const [isNavOpen, setIsNavOpen] = React.useState(false);
 
   const handleLoginClick = () => {
@@ -113,16 +111,6 @@ export const Navbar: React.FC = () => {
                 className="h-8 w-8"
               />
               <span className="text-xl sm:text-2xl font-bold text-foreground">SwitchMinds</span>
-            </div>
-          )}
-
-          {/* Center - Model Selector (only on chat page and only if user is authenticated) */}
-          {isChatPage && user && (
-            <div className="hidden md:block">
-              <ModelSelector 
-                selectedModel={selectedModel}
-                onModelChange={setSelectedModel}
-              />
             </div>
           )}
 

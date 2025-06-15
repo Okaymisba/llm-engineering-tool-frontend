@@ -106,6 +106,7 @@ export const ChatPage: React.FC = () => {
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isUserScrolled, setIsUserScrolled] = useState(false);
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
 
   const { user, token, logout } = useAuth();
   const { toast } = useToast();
@@ -114,6 +115,37 @@ export const ChatPage: React.FC = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Load models when component mounts
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        console.log('Loading models...');
+        setModelsLoading(true);
+        const models = await fetchModels();
+        console.log('Models loaded:', models);
+        setAvailableModels(models);
+        
+        // Set default model if none selected
+        if (!selectedModel && models.length > 0) {
+          const defaultModel = models.find(m => m.name === 'Gemini 2.0') || models[0];
+          console.log('Setting default model:', defaultModel);
+          setSelectedModel(defaultModel.id);
+        }
+      } catch (error) {
+        console.error('Error loading models:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load models. Please refresh the page.",
+          variant: "destructive",
+        });
+      } finally {
+        setModelsLoading(false);
+      }
+    };
+
+    loadModels();
+  }, [selectedModel, toast]);
 
   const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -206,6 +238,21 @@ export const ChatPage: React.FC = () => {
       return;
     }
 
+    // Debug: Log model selection
+    const selectedModelData = availableModels.find(m => m.id === selectedModel);
+    console.log('Selected model ID:', selectedModel);
+    console.log('Available models:', availableModels);
+    console.log('Selected model data:', selectedModelData);
+    
+    if (!selectedModelData) {
+      toast({
+        title: "Model Error",
+        description: "Please select a valid model before sending a message.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       content: inputValue,
@@ -222,7 +269,6 @@ export const ChatPage: React.FC = () => {
     setIsUserScrolled(false);
 
     const aiMessageId = (Date.now() + 1).toString();
-    const selectedModelData = availableModels.find(m => m.id === selectedModel);
     const isReasoningModel = selectedModelData?.isReasoning || false;
     
     const aiMessage: Message = {
@@ -243,11 +289,18 @@ export const ChatPage: React.FC = () => {
       const formData = new FormData();
       formData.append('session_id', sessionId);
       formData.append('question', currentInput);
-      formData.append('provider', selectedModelData?.provider || 'google');
-      formData.append('model', selectedModelData?.model_id || selectedModel); // Send model_id instead of UUID
+      formData.append('provider', selectedModelData.provider);
+      formData.append('model', selectedModelData.model_id); // Use model_id instead of UUID
       formData.append('web_search', webSearchEnabled.toString());
       formData.append('our_image_processing_algo', 'false');
       formData.append('document_semantic_search', 'false');
+
+      // Debug: Log what we're sending
+      console.log('Sending to backend:', {
+        provider: selectedModelData.provider,
+        model: selectedModelData.model_id,
+        web_search: webSearchEnabled.toString()
+      });
 
       currentFiles.forEach((uploadedFile) => {
         if (uploadedFile.type === 'image') {
@@ -469,6 +522,15 @@ export const ChatPage: React.FC = () => {
 
       {/* Chat Container */}
       <div className="flex-1 w-full max-w-4xl mx-auto px-4 flex flex-col relative">
+        {/* Header with Model Selector */}
+        <div className="py-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+          <ModelSelector 
+            selectedModel={selectedModel}
+            onModelChange={setSelectedModel}
+            loading={modelsLoading}
+          />
+        </div>
+
         {/* Messages Area */}
         <div 
           ref={scrollContainerRef}
@@ -482,7 +544,7 @@ export const ChatPage: React.FC = () => {
                 <Sparkles className="h-12 w-12 text-green-600 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">How can I help you today?</h3>
                 <p className="text-gray-600">
-                  Start a conversation with {availableModels.find(m => m.id === selectedModel)?.name}.
+                  Start a conversation with {availableModels.find(m => m.id === selectedModel)?.name || 'AI'}.
                 </p>
               </div>
             </div>

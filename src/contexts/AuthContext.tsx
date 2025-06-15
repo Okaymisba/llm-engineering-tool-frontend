@@ -109,7 +109,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('Handling user session for:', supabaseUser.id);
       
       // Get or create user profile - Fixed the query execution
-      const { data: profileData, error } = supabase
+      const { data: profileData, error } = await supabase
         .from('profiles')
         .select('id,username,first_name,last_name')
         .eq('id', supabaseUser.id)

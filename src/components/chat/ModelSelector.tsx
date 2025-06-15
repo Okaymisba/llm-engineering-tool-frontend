@@ -133,7 +133,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                       {selectedModelData.name}
                     </span>
                     {selectedModelData.isReasoning && (
-                      <Brain className="h-3 w-3 text-purple-600" title="Reasoning Model" />
+                      <Brain className="h-3 w-3 text-purple-600" />
                     )}
                   </div>
                   <div className="flex items-center space-x-2">
@@ -210,7 +210,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                           {model.name}
                         </span>
                         {model.isReasoning && (
-                          <Brain className="h-3 w-3 text-purple-600 flex-shrink-0" title="Reasoning Model" />
+                          <Brain className="h-3 w-3 text-purple-600 flex-shrink-0" />
                         )}
                         {model.badge && (
                           <Badge

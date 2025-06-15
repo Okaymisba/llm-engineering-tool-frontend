@@ -72,20 +72,9 @@ export const WebSearchResults: React.FC<WebSearchResultsProps> = ({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2 mb-2">
                           <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500"></div>
-                          {result.url ? (
-                            <a
-                              href={result.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm font-semibold text-gray-900 hover:text-purple-700 transition-colors line-clamp-1 cursor-pointer"
-                            >
-                              {result.title || 'Web result'}
-                            </a>
-                          ) : (
-                            <h4 className="text-sm font-semibold text-gray-900 line-clamp-1">
-                              {result.title || 'Web result'}
-                            </h4>
-                          )}
+                          <h4 className="text-sm font-semibold text-gray-900 group-hover:text-purple-700 transition-colors line-clamp-1">
+                            {result.title || 'Web result'}
+                          </h4>
                         </div>
                         {result.snippet && (
                           <p className="text-xs text-gray-600 leading-relaxed line-clamp-2 mb-2">
@@ -93,15 +82,10 @@ export const WebSearchResults: React.FC<WebSearchResultsProps> = ({
                           </p>
                         )}
                         {result.url && (
-                          <a
-                            href={result.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center space-x-1 text-xs text-purple-600 hover:text-purple-700 transition-colors cursor-pointer hover:underline"
-                          >
+                          <div className="flex items-center space-x-1 text-xs text-purple-600 hover:text-purple-700">
                             <ExternalLink className="h-3 w-3" />
                             <span className="truncate max-w-xs">{new URL(result.url).hostname}</span>
-                          </a>
+                          </div>
                         )}
                       </div>
                     </div>

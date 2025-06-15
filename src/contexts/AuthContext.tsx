@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,12 +40,12 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [user, setUser] = React.useState<User | null>(null);
+  const [token, setToken] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [isInitialized, setIsInitialized] = React.useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
@@ -108,7 +107,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('Handling user session for:', supabaseUser.id);
       
-      // Get or create user profile - Fixed the query execution
+      // Get or create user profile
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('id,username,first_name,last_name')

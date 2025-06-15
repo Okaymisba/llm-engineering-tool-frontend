@@ -1,10 +1,9 @@
 
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, Zap, AlertCircle } from 'lucide-react';
+import { useCachedModels } from '@/hooks/useCachedModels';
 
 interface Model {
   id: string;
@@ -15,31 +14,9 @@ interface Model {
 }
 
 export const ModelsShowcase: React.FC = () => {
-  const { data: models, isLoading, error } = useQuery({
-    queryKey: ['models'],
-    queryFn: async () => {
-      console.log('Fetching models from Supabase...');
-      const { data, error } = await supabase
-        .from('models')
-        .select('id, name, total_tokens_this_month, provider, is_enabled')
-        .eq('is_enabled', true)
-        .order('total_tokens_this_month', { ascending: false })
-        .limit(10);
+  const { models, loading, error } = useCachedModels();
 
-      if (error) {
-        console.error('Error fetching models:', error);
-        throw error;
-      }
-
-      console.log('Models fetched successfully:', data);
-      return data as Model[];
-    },
-    retry: 3,
-    retryDelay: 1000,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  if (isLoading) {
+  if (loading) {
     return (
       <section className="py-16 bg-gradient-to-b from-gray-50 to-white">
         <div className="container mx-auto px-4">

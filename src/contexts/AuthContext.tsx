@@ -21,6 +21,7 @@ interface AuthContextType {
   verifyOTP: (email: string, otp: string) => Promise<void>;
   requestOTP: (email: string, username: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInWithGitHub: () => Promise<void>;
   isLoading: boolean;
   isInitialized: boolean;
 }
@@ -107,12 +108,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('Handling user session for:', supabaseUser.id);
       
-      // Get or create user profile
-      let { data: profile, error } = supabase
+      // Get or create user profile - Fixed the query execution
+      const { data: profileData, error } = supabase
         .from('profiles')
         .select('id,username,first_name,last_name')
         .eq('id', supabaseUser.id)
         .single();
+
+      let profile = profileData;
 
       if (error && error.code === 'PGRST116') {
         // Profile doesn't exist, create it
@@ -266,6 +269,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const signInWithGitHub = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/`
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    } catch (error) {
+      console.error('GitHub sign in error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     setIsLoading(true);
     try {
@@ -306,6 +330,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     verifyOTP,
     requestOTP,
     signInWithGoogle,
+    signInWithGitHub,
     isLoading,
     isInitialized,
   };

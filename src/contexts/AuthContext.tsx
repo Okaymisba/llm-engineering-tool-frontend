@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User as SupabaseUser } from '@supabase/supabase-js';
+import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface User {
@@ -13,6 +13,7 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
@@ -23,6 +24,8 @@ interface AuthContextType {
   signInWithGitHub: () => Promise<void>;
   isLoading: boolean;
   isInitialized: boolean;
+  refreshSession: () => Promise<boolean>;
+  isTokenValid: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,9 +44,56 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = React.useState<User | null>(null);
+  const [session, setSession] = React.useState<Session | null>(null);
   const [token, setToken] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isInitialized, setIsInitialized] = React.useState(false);
+
+  // Check if current token is valid (not expired)
+  const isTokenValid = React.useCallback(() => {
+    if (!session) return false;
+    
+    const now = Math.floor(Date.now() / 1000);
+    const expiresAt = session.expires_at || 0;
+    
+    // Add 5 minute buffer before expiration
+    const isValid = expiresAt > (now + 300);
+    
+    if (!isValid) {
+      console.log('Token expired or expiring soon:', {
+        expiresAt: new Date(expiresAt * 1000),
+        now: new Date(now * 1000),
+        timeLeft: expiresAt - now
+      });
+    }
+    
+    return isValid;
+  }, [session]);
+
+  // Refresh session manually
+  const refreshSession = React.useCallback(async (): Promise<boolean> => {
+    try {
+      console.log('Manually refreshing session...');
+      const { data: { session: newSession }, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.error('Session refresh failed:', error);
+        return false;
+      }
+      
+      if (newSession) {
+        console.log('Session refreshed successfully');
+        setSession(newSession);
+        setToken(newSession.access_token);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error refreshing session:', error);
+      return false;
+    }
+  }, []);
 
   React.useEffect(() => {
     let mounted = true;
@@ -62,7 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (mounted) {
           if (session?.user) {
             console.log('Found existing session, setting user');
-            await handleUserSession(session.user, session.access_token);
+            await handleUserSession(session.user, session);
           } else {
             console.log('No existing session found');
           }
@@ -85,11 +135,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (event === 'SIGNED_OUT') {
         console.log('User signed out, clearing state');
         setUser(null);
+        setSession(null);
         setToken(null);
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('Token refreshed automatically');
+        if (session) {
+          setSession(session);
+          setToken(session.access_token);
+        }
       } else if (session?.user) {
-        await handleUserSession(session.user, session.access_token);
+        await handleUserSession(session.user, session);
       } else {
         setUser(null);
+        setSession(null);
         setToken(null);
       }
     });
@@ -103,12 +161,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-  const handleUserSession = async (supabaseUser: SupabaseUser, accessToken: string) => {
+  const handleUserSession = async (supabaseUser: SupabaseUser, userSession: Session) => {
     try {
       console.log('Handling user session for:', supabaseUser.id);
       
+      // Set session and token first
+      setSession(userSession);
+      setToken(userSession.access_token);
+      
       // Get or create user profile
-      const { data: profileData, error } = supabase
+      const { data: profileData, error } = await supabase
         .from('profiles')
         .select('id,username,first_name,last_name')
         .eq('id', supabaseUser.id)
@@ -151,7 +213,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('Setting user data:', userData);
       setUser(userData);
-      setToken(accessToken);
     } catch (error) {
       console.error('Error handling user session:', error);
     }
@@ -304,6 +365,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Clear local state immediately
       setUser(null);
+      setSession(null);
       setToken(null);
       
       // Clear any remaining local storage items
@@ -322,6 +384,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const value: AuthContextType = {
     user,
+    session,
     token,
     login,
     register,
@@ -332,6 +395,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signInWithGitHub,
     isLoading,
     isInitialized,
+    refreshSession,
+    isTokenValid,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

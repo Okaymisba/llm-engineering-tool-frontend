@@ -183,7 +183,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, username }) =
 
               {/* Reasoning Section */}
               {message.reasoning !== undefined && (
-                <Collapsible className="mb-4">
+                <Collapsible defaultOpen={true} className="mb-4">
                   <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors">
                     <div className="flex items-center space-x-2">
                       <div className={`w-2 h-2 rounded-full ${message.isReasoningComplete ? 'bg-orange-500' : 'bg-orange-500 animate-pulse'}`}></div>

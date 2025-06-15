@@ -20,9 +20,9 @@ export const WebSearchToggle: React.FC<WebSearchToggleProps> = ({
       onClick={() => onToggle(!enabled)}
       disabled={disabled}
       variant={enabled ? "default" : "outline"}
-      size="sm"
+      size="icon"
       className={cn(
-        "h-8 shrink-0 transition-colors flex items-center gap-2",
+        "h-8 w-8 shrink-0 transition-colors",
         enabled 
           ? "bg-blue-600 hover:bg-blue-700 text-white" 
           : "border-gray-300 hover:bg-gray-100"
@@ -30,7 +30,6 @@ export const WebSearchToggle: React.FC<WebSearchToggleProps> = ({
       title={enabled ? "Web search enabled" : "Web search disabled"}
     >
       <Globe className="h-4 w-4" />
-      <span className="hidden sm:inline">Search</span>
     </Button>
   );
 };

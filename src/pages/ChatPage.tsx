@@ -583,20 +583,22 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
 
         {/* Input Area */}
         <div className="py-4 sticky bottom-0 bg-gray-50">
-          <div className="bg-white rounded-xl border shadow-sm p-3">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200 p-4">
             <div className="flex items-end gap-3">
-              <FileUpload 
-                uploadedFiles={uploadedFiles}
-                setUploadedFiles={setUploadedFiles}
-                isLoading={isLoading}
-                onFileAdded={handleFileAdded}
-              />
-              
-              <WebSearchToggle
-                enabled={webSearchEnabled}
-                onToggle={setWebSearchEnabled}
-                disabled={isLoading}
-              />
+              <div className="flex items-center gap-2">
+                <FileUpload 
+                  uploadedFiles={uploadedFiles}
+                  setUploadedFiles={setUploadedFiles}
+                  isLoading={isLoading}
+                  onFileAdded={handleFileAdded}
+                />
+                
+                <WebSearchToggle
+                  enabled={webSearchEnabled}
+                  onToggle={setWebSearchEnabled}
+                  disabled={isLoading}
+                />
+              </div>
               
               <div className="flex-1 min-w-0 relative">
                 <Textarea
@@ -605,7 +607,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyPress}
                   placeholder="Message Syncmind..."
-                  className="min-h-[24px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base"
+                  className="min-h-[40px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base bg-transparent"
                   disabled={isLoading}
                   rows={1}
                   style={{ 
@@ -624,7 +626,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
                 onClick={handleSendMessage}
                 disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading}
                 size="icon"
-                className="h-8 w-8 bg-gray-900 hover:bg-gray-800 rounded-lg shrink-0"
+                className="h-10 w-10 bg-blue-600 hover:bg-blue-700 rounded-xl shrink-0 shadow-md hover:shadow-lg transition-all duration-200"
               >
                 <Send className="h-4 w-4" />
               </Button>

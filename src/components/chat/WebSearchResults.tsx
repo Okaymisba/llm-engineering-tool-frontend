@@ -22,7 +22,7 @@ export const WebSearchResults: React.FC<WebSearchResultsProps> = ({
   if (!isSearching && !webSearchResults) return null;
 
   return (
-    <Collapsible className="mb-4">
+    <Collapsible defaultOpen={true} className="mb-4">
       <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-2xl hover:from-purple-100 hover:to-blue-100 transition-all duration-200 shadow-sm hover:shadow-md">
         <div className="flex items-center space-x-3">
           <div className="relative">

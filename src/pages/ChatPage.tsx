@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Settings, LogOut, History, X, ArrowDown, User, UserCheck2Icon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,8 +16,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { FileUpload } from '@/components/chat/FileUpload';
-import { ModelSelector, fetchModels } from '@/components/chat/ModelSelector';
+import { fetchModels } from '@/components/chat/ModelSelector';
 import { Model } from '@/types/model';
+import { WebSearchToggle } from '@/components/chat/WebSearchToggle';
 
 interface Message {
   id: string;
@@ -26,6 +28,8 @@ interface Message {
   isStreaming?: boolean;
   reasoning?: string;
   isReasoningComplete?: boolean;
+  webSearchResults?: any[];
+  isSearching?: boolean;
   metadata?: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -37,6 +41,11 @@ interface UploadedFile {
   file: File;
   type: 'image' | 'document';
   preview?: string;
+}
+
+interface ChatPageProps {
+  selectedModel: string;
+  onModelChange: (model: string) => void;
 }
 
 // Helper function to parse JSON objects from stream
@@ -92,16 +101,17 @@ const parseJSONStream = (buffer: string): { parsed: any[], remaining: string } =
   };
 };
 
-export const ChatPage: React.FC = () => {
-  const [selectedModel, setSelectedModel] = useState('');
+export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isUserScrolled, setIsUserScrolled] = useState(false);
-  const [availableModels, setAvailableModels] = useState<Model[]>([]); // New state for models
+  const [availableModels, setAvailableModels] = useState<Model[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
 
   const { user, token, logout } = useAuth();
   const { toast } = useToast();
@@ -110,6 +120,37 @@ export const ChatPage: React.FC = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Load models when component mounts
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        console.log('Loading models...');
+        setModelsLoading(true);
+        const models = await fetchModels();
+        console.log('Models loaded:', models);
+        setAvailableModels(models);
+        
+        // Set default model if none selected
+        if (!selectedModel && models.length > 0) {
+          const defaultModel = models.find(m => m.name === 'Gemini 2.0') || models[0];
+          console.log('Setting default model:', defaultModel);
+          onModelChange(defaultModel.id);
+        }
+      } catch (error) {
+        console.error('Error loading models:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load models. Please refresh the page.",
+          variant: "destructive",
+        });
+      } finally {
+        setModelsLoading(false);
+      }
+    };
+
+    loadModels();
+  }, [selectedModel, onModelChange, toast]);
 
   const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -202,6 +243,21 @@ export const ChatPage: React.FC = () => {
       return;
     }
 
+    // Debug: Log model selection
+    const selectedModelData = availableModels.find(m => m.id === selectedModel);
+    console.log('Selected model ID:', selectedModel);
+    console.log('Available models:', availableModels);
+    console.log('Selected model data:', selectedModelData);
+    
+    if (!selectedModelData) {
+      toast({
+        title: "Model Error",
+        description: "Please select a valid model before sending a message.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       content: inputValue,
@@ -218,7 +274,6 @@ export const ChatPage: React.FC = () => {
     setIsUserScrolled(false);
 
     const aiMessageId = (Date.now() + 1).toString();
-    const selectedModelData = availableModels.find(m => m.id === selectedModel);
     const isReasoningModel = selectedModelData?.isReasoning || false;
     
     const aiMessage: Message = {
@@ -229,6 +284,8 @@ export const ChatPage: React.FC = () => {
       isStreaming: true,
       reasoning: isReasoningModel ? '' : undefined,
       isReasoningComplete: false,
+      isSearching: webSearchEnabled,
+      webSearchResults: undefined,
     };
 
     setMessages(prev => [...prev, aiMessage]);
@@ -237,10 +294,18 @@ export const ChatPage: React.FC = () => {
       const formData = new FormData();
       formData.append('session_id', sessionId);
       formData.append('question', currentInput);
-      formData.append('provider', selectedModelData?.provider || 'google');
-      formData.append('model', selectedModel);
+      formData.append('provider', selectedModelData.provider);
+      formData.append('model', selectedModelData.model_id); // Use model_id instead of UUID
+      formData.append('web_search', webSearchEnabled.toString());
       formData.append('our_image_processing_algo', 'false');
       formData.append('document_semantic_search', 'false');
+
+      // Debug: Log what we're sending
+      console.log('Sending to backend:', {
+        provider: selectedModelData.provider,
+        model: selectedModelData.model_id,
+        web_search: webSearchEnabled.toString()
+      });
 
       currentFiles.forEach((uploadedFile) => {
         if (uploadedFile.type === 'image') {
@@ -288,7 +353,49 @@ export const ChatPage: React.FC = () => {
             buffer = remaining;
             
             for (const parsedChunk of parsed) {
-              if (parsedChunk.type === 'reasoning') {
+              console.log('Received chunk:', parsedChunk);
+              
+              if (parsedChunk.type === 'web_search') {
+                console.log('Web search chunk data:', parsedChunk.data);
+                
+                if (typeof parsedChunk.data === 'string') {
+                  // Still searching
+                  setMessages(prev => 
+                    prev.map(msg => 
+                      msg.id === aiMessageId 
+                        ? { ...msg, isSearching: true }
+                        : msg
+                    )
+                  );
+                } else {
+                  // Search results received - extract from nested array structure
+                  let searchResults = [];
+                  
+                  if (Array.isArray(parsedChunk.data) && parsedChunk.data.length > 0) {
+                    // Handle nested array structure: data: [[{results}]]
+                    if (Array.isArray(parsedChunk.data[0])) {
+                      searchResults = parsedChunk.data[0];
+                    } else {
+                      // Handle flat array structure: data: [{results}]
+                      searchResults = parsedChunk.data;
+                    }
+                  }
+                  
+                  console.log('Processed search results:', searchResults);
+                  
+                  setMessages(prev => 
+                    prev.map(msg => 
+                      msg.id === aiMessageId 
+                        ? { 
+                            ...msg, 
+                            isSearching: false, 
+                            webSearchResults: searchResults
+                          }
+                        : msg
+                    )
+                  );
+                }
+              } else if (parsedChunk.type === 'reasoning') {
                 accumulatedReasoning += parsedChunk.data;
                 setMessages(prev => 
                   prev.map(msg => 
@@ -324,6 +431,19 @@ export const ChatPage: React.FC = () => {
                       : msg
                   )
                 );
+              } else if (parsedChunk.type === 'error') {
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { 
+                          ...msg, 
+                          content: `Error: ${parsedChunk.data}`,
+                          isStreaming: false,
+                          isSearching: false
+                        }
+                      : msg
+                  )
+                );
               }
             }
           }
@@ -335,7 +455,12 @@ export const ChatPage: React.FC = () => {
       setMessages(prev => 
         prev.map(msg => 
           msg.id === aiMessageId 
-            ? { ...msg, isStreaming: false, isReasoningComplete: true }
+            ? { 
+                ...msg, 
+                isStreaming: false, 
+                isReasoningComplete: true,
+                isSearching: false
+              }
             : msg
         )
       );
@@ -374,7 +499,8 @@ export const ChatPage: React.FC = () => {
             ? { 
                 ...msg, 
                 content: "Sorry, I encountered an error while processing your request. Please try again.",
-                isStreaming: false
+                isStreaming: false,
+                isSearching: false
               }
             : msg
         )
@@ -416,7 +542,6 @@ export const ChatPage: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full bg-gray-50 flex flex-col font-sans">
-
       {/* Chat Container */}
       <div className="flex-1 w-full max-w-4xl mx-auto px-4 flex flex-col relative">
         {/* Messages Area */}
@@ -432,7 +557,7 @@ export const ChatPage: React.FC = () => {
                 <Sparkles className="h-12 w-12 text-green-600 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">How can I help you today?</h3>
                 <p className="text-gray-600">
-                  Start a conversation with {availableModels.find(m => m.id === selectedModel)?.name}.
+                  Start a conversation with {availableModels.find(m => m.id === selectedModel)?.name || 'AI'}.
                 </p>
               </div>
             </div>
@@ -477,14 +602,22 @@ export const ChatPage: React.FC = () => {
 
         {/* Input Area */}
         <div className="py-4 sticky bottom-0 bg-gray-50">
-          <div className="bg-white rounded-xl border shadow-sm p-3">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200 p-4">
             <div className="flex items-end gap-3">
-              <FileUpload 
-                uploadedFiles={uploadedFiles}
-                setUploadedFiles={setUploadedFiles}
-                isLoading={isLoading}
-                onFileAdded={handleFileAdded}
-              />
+              <div className="flex items-center gap-2">
+                <FileUpload 
+                  uploadedFiles={uploadedFiles}
+                  setUploadedFiles={setUploadedFiles}
+                  isLoading={isLoading}
+                  onFileAdded={handleFileAdded}
+                />
+                
+                <WebSearchToggle
+                  enabled={webSearchEnabled}
+                  onToggle={setWebSearchEnabled}
+                  disabled={isLoading}
+                />
+              </div>
               
               <div className="flex-1 min-w-0 relative">
                 <Textarea
@@ -493,7 +626,7 @@ export const ChatPage: React.FC = () => {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyPress}
                   placeholder="Message Syncmind..."
-                  className="min-h-[24px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base"
+                  className="min-h-[40px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base bg-transparent"
                   disabled={isLoading}
                   rows={1}
                   style={{ 
@@ -512,7 +645,7 @@ export const ChatPage: React.FC = () => {
                 onClick={handleSendMessage}
                 disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading}
                 size="icon"
-                className="h-8 w-8 bg-gray-900 hover:bg-gray-800 rounded-lg shrink-0"
+                className="h-10 w-10 bg-blue-600 hover:bg-blue-700 rounded-xl shrink-0 shadow-md hover:shadow-lg transition-all duration-200"
               >
                 <Send className="h-4 w-4" />
               </Button>

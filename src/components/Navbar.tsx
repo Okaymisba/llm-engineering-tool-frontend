@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MessageSquare, LayoutDashboard, Key, Settings, User, History, LogOut, Menu, CreditCard, Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ModelSelector } from '@/components/chat/ModelSelector';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +25,17 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-export const Navbar: React.FC = () => {
+interface NavbarProps {
+  selectedModel?: string;
+  onModelChange?: (model: string) => void;
+  showModelSelector?: boolean;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ 
+  selectedModel = '', 
+  onModelChange = () => {}, 
+  showModelSelector = false 
+}) => {
   const { user, logout } = useAuth();
   const { profile } = useProfile();
   const { setAuthState } = useAuthState();
@@ -111,6 +122,17 @@ export const Navbar: React.FC = () => {
                 className="h-8 w-8"
               />
               <span className="text-xl sm:text-2xl font-bold text-foreground">SwitchMinds</span>
+            </div>
+          )}
+
+          {/* Center - Model Selector (Desktop only) */}
+          {!isMobile && showModelSelector && user && (
+            <div className="flex-1 flex justify-center mx-8">
+              <ModelSelector
+                selectedModel={selectedModel}
+                onModelChange={onModelChange}
+                variant="navbar"
+              />
             </div>
           )}
 
@@ -228,6 +250,17 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile Model Selector - Sticky below navbar */}
+      {isMobile && showModelSelector && user && (
+        <div className="border-t bg-background/95 backdrop-blur-sm sticky top-[73px] z-40 px-4 py-3">
+          <ModelSelector
+            selectedModel={selectedModel}
+            onModelChange={onModelChange}
+            variant="mobile"
+          />
+        </div>
+      )}
     </header>
   );
-}; 
+};

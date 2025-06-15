@@ -9,6 +9,7 @@ import { Check, ChevronDown, Sparkles, Zap, Eye, Brain, Search, Loader2 } from '
 import { supabase } from '@/integrations/supabase/client';
 import { Model } from '@/types/model';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export const fetchModels = async (): Promise<Model[]> => {
   const { data, error } = await supabase
@@ -69,16 +70,19 @@ interface ModelSelectorProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
   loading?: boolean;
+  variant?: 'navbar' | 'mobile' | 'default';
 }
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ 
   selectedModel, 
   onModelChange, 
-  loading = false 
+  loading = false,
+  variant = 'default'
 }) => {
   const [models, setModels] = useState<Model[]>([]);
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const loadModels = async () => {
@@ -101,10 +105,25 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     model.provider.toLowerCase().includes(searchValue.toLowerCase())
   );
 
+  // Responsive width based on variant and screen size
+  const getButtonWidth = () => {
+    if (variant === 'navbar') return 'w-full max-w-xs';
+    if (variant === 'mobile') return 'w-full';
+    return 'w-full max-w-md';
+  };
+
+  const getPopoverWidth = () => {
+    if (variant === 'navbar' || isMobile) return 'w-[320px]';
+    return 'w-[400px]';
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center w-full max-w-md mx-auto">
-        <div className="flex items-center space-x-2 px-4 py-3 bg-white/60 backdrop-blur-md rounded-2xl border border-white/20 shadow-lg">
+      <div className={cn(
+        "flex items-center justify-center",
+        variant === 'navbar' ? 'w-full max-w-xs' : variant === 'mobile' ? 'w-full' : 'w-full max-w-md mx-auto'
+      )}>
+        <div className="flex items-center space-x-2 px-3 py-2 bg-white/60 backdrop-blur-md rounded-xl border border-white/20 shadow-lg">
           <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
           <span className="text-sm text-gray-600">Loading models...</span>
         </div>
@@ -113,58 +132,83 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   }
 
   return (
-    <div className="flex items-center justify-center w-full">
+    <div className={cn(
+      "flex items-center",
+      variant === 'navbar' ? 'justify-center w-full' : variant === 'mobile' ? 'justify-center w-full' : 'justify-center w-full'
+    )}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full max-w-md justify-between bg-white/60 backdrop-blur-md border-white/20 shadow-lg hover:shadow-xl transition-all duration-200 rounded-2xl px-4 py-3 h-auto"
+            className={cn(
+              "justify-between bg-white/60 backdrop-blur-md border-white/20 shadow-lg hover:shadow-xl transition-all duration-200 rounded-xl h-auto",
+              getButtonWidth(),
+              variant === 'navbar' ? 'px-3 py-2' : 'px-4 py-3'
+            )}
           >
             {selectedModelData ? (
-              <div className="flex items-center space-x-3 min-w-0 flex-1">
-                <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${getProviderGradient(selectedModelData.provider)} flex items-center justify-center text-white text-sm font-medium shadow-sm`}>
+              <div className="flex items-center space-x-2 min-w-0 flex-1">
+                <div className={cn(
+                  "rounded-full bg-gradient-to-br flex items-center justify-center text-white font-medium shadow-sm",
+                  `bg-gradient-to-br ${getProviderGradient(selectedModelData.provider)}`,
+                  variant === 'navbar' ? 'w-6 h-6 text-xs' : 'w-8 h-8 text-sm'
+                )}>
                   {getProviderIcon(selectedModelData.provider)}
                 </div>
                 <div className="flex flex-col items-start min-w-0 flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-semibold text-gray-900 truncate">
+                  <div className="flex items-center space-x-1">
+                    <span className={cn(
+                      "font-semibold text-gray-900 truncate",
+                      variant === 'navbar' ? 'text-sm' : 'text-base'
+                    )}>
                       {selectedModelData.name}
                     </span>
                     {selectedModelData.isReasoning && (
-                      <Brain className="h-3 w-3 text-purple-600" />
+                      <Brain className={cn(
+                        "text-purple-600",
+                        variant === 'navbar' ? 'h-3 w-3' : 'h-3 w-3'
+                      )} />
                     )}
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-500 capitalize">
-                      {selectedModelData.provider}
-                    </span>
-                    {selectedModelData.badge && (
-                      <Badge
-                        variant={selectedModelData.badge === 'Free' ? 'default' : 'secondary'}
-                        className={cn(
-                          "text-xs px-2 py-0.5 rounded-full",
-                          selectedModelData.badge === 'Free'
-                            ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200'
-                            : 'bg-gradient-to-r from-purple-100 to-violet-100 text-purple-700 border-purple-200'
-                        )}
-                      >
-                        {selectedModelData.badge}
-                      </Badge>
-                    )}
-                  </div>
+                  {variant !== 'navbar' && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-500 capitalize">
+                        {selectedModelData.provider}
+                      </span>
+                      {selectedModelData.badge && (
+                        <Badge
+                          variant={selectedModelData.badge === 'Free' ? 'default' : 'secondary'}
+                          className={cn(
+                            "text-xs px-2 py-0.5 rounded-full",
+                            selectedModelData.badge === 'Free'
+                              ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200'
+                              : 'bg-gradient-to-r from-purple-100 to-violet-100 text-purple-700 border-purple-200'
+                          )}
+                        >
+                          {selectedModelData.badge}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
               <span className="text-gray-500">Select a model...</span>
             )}
-            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50 transition-transform duration-200 data-[state=open]:rotate-180" />
+            <ChevronDown className={cn(
+              "shrink-0 opacity-50 transition-transform duration-200 data-[state=open]:rotate-180",
+              variant === 'navbar' ? 'ml-1 h-3 w-3' : 'ml-2 h-4 w-4'
+            )} />
           </Button>
         </PopoverTrigger>
         
-        <PopoverContent className="w-[400px] p-0 bg-white/95 backdrop-blur-xl border-white/20 shadow-2xl rounded-2xl">
-          <Command className="rounded-2xl">
+        <PopoverContent className={cn(
+          "p-0 bg-white/95 backdrop-blur-xl border-white/20 shadow-2xl rounded-xl",
+          getPopoverWidth()
+        )}>
+          <Command className="rounded-xl">
             <div className="flex items-center border-b border-gray-100 px-3">
               <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <CommandInput

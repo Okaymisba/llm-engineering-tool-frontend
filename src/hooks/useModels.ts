@@ -21,6 +21,7 @@ export const useModels = () => {
         id: model.model_id,
         name: model.name,
         provider: model.provider,
+        model_id: model.model_id,
         is_enabled: model.is_enabled || false,
         total_tokens_this_month: model.total_tokens_this_month || 0,
         badge: model.badge,

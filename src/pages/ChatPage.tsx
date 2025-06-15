@@ -244,7 +244,7 @@ export const ChatPage: React.FC = () => {
       formData.append('session_id', sessionId);
       formData.append('question', currentInput);
       formData.append('provider', selectedModelData?.provider || 'google');
-      formData.append('model', selectedModel);
+      formData.append('model', selectedModelData?.model_id || selectedModel); // Send model_id instead of UUID
       formData.append('web_search', webSearchEnabled.toString());
       formData.append('our_image_processing_algo', 'false');
       formData.append('document_semantic_search', 'false');

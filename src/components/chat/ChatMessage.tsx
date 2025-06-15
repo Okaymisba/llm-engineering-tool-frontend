@@ -1,13 +1,13 @@
-
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Copy, Search, Globe } from 'lucide-react';
+import { ChevronDown, Copy } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { WebSearchResults } from './WebSearchResults';
 
 interface Message {
   id: string;
@@ -175,46 +175,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, username }) =
             </p>
           ) : (
             <div className="prose prose-sm max-w-none text-gray-800">
-              {/* Web Search Section */}
-              {(message.isSearching || message.webSearchResults) && (
-                <Collapsible className="mb-4">
-                  <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
-                    <div className="flex items-center space-x-2">
-                      <div className={`w-2 h-2 rounded-full ${message.isSearching ? 'bg-blue-500 animate-pulse' : 'bg-blue-500'}`}></div>
-                      <Globe className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm font-medium text-blue-800">
-                        {message.isSearching ? 'Searching the web...' : 'Web Search Results'}
-                      </span>
-                    </div>
-                    <ChevronDown className="h-4 w-4 text-blue-600 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2">
-                    <div className="p-3 bg-blue-25 border border-blue-100 rounded-lg">
-                      {message.isSearching ? (
-                        <div className="flex items-center space-x-2 text-blue-700">
-                          <Search className="h-4 w-4 animate-pulse" />
-                          <span className="text-sm">Searching for relevant information...</span>
-                        </div>
-                      ) : message.webSearchResults && message.webSearchResults.length > 0 ? (
-                        <div className="space-y-2">
-                          {message.webSearchResults.map((result, index) => (
-                            <div key={index} className="p-2 bg-white rounded border border-blue-200">
-                              <div className="text-sm text-blue-900">
-                                <strong>Source {index + 1}:</strong> {result.title || result.url || 'Web result'}
-                              </div>
-                              {result.snippet && (
-                                <p className="text-xs text-blue-700 mt-1">{result.snippet}</p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-blue-700">No search results found</div>
-                      )}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
+              {/* Web Search Section - Using new component */}
+              <WebSearchResults 
+                isSearching={message.isSearching}
+                webSearchResults={message.webSearchResults}
+              />
 
               {/* Reasoning Section */}
               {message.reasoning !== undefined && (

@@ -17,6 +17,7 @@ import { ChatMessage } from '@/components/chat/ChatMessage';
 import { FileUpload } from '@/components/chat/FileUpload';
 import { ModelSelector, fetchModels } from '@/components/chat/ModelSelector';
 import { Model } from '@/types/model';
+import { WebSearchToggle } from '@/components/chat/WebSearchToggle';
 
 interface Message {
   id: string;
@@ -26,6 +27,8 @@ interface Message {
   isStreaming?: boolean;
   reasoning?: string;
   isReasoningComplete?: boolean;
+  webSearchResults?: any[];
+  isSearching?: boolean;
   metadata?: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -98,10 +101,11 @@ export const ChatPage: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isUserScrolled, setIsUserScrolled] = useState(false);
-  const [availableModels, setAvailableModels] = useState<Model[]>([]); // New state for models
+  const [availableModels, setAvailableModels] = useState<Model[]>([]);
 
   const { user, token, logout } = useAuth();
   const { toast } = useToast();
@@ -229,6 +233,8 @@ export const ChatPage: React.FC = () => {
       isStreaming: true,
       reasoning: isReasoningModel ? '' : undefined,
       isReasoningComplete: false,
+      isSearching: webSearchEnabled,
+      webSearchResults: undefined,
     };
 
     setMessages(prev => [...prev, aiMessage]);
@@ -239,6 +245,7 @@ export const ChatPage: React.FC = () => {
       formData.append('question', currentInput);
       formData.append('provider', selectedModelData?.provider || 'google');
       formData.append('model', selectedModel);
+      formData.append('web_search', webSearchEnabled.toString());
       formData.append('our_image_processing_algo', 'false');
       formData.append('document_semantic_search', 'false');
 
@@ -288,7 +295,31 @@ export const ChatPage: React.FC = () => {
             buffer = remaining;
             
             for (const parsedChunk of parsed) {
-              if (parsedChunk.type === 'reasoning') {
+              if (parsedChunk.type === 'web_search') {
+                if (typeof parsedChunk.data === 'string') {
+                  // Still searching
+                  setMessages(prev => 
+                    prev.map(msg => 
+                      msg.id === aiMessageId 
+                        ? { ...msg, isSearching: true }
+                        : msg
+                    )
+                  );
+                } else {
+                  // Search results received
+                  setMessages(prev => 
+                    prev.map(msg => 
+                      msg.id === aiMessageId 
+                        ? { 
+                            ...msg, 
+                            isSearching: false, 
+                            webSearchResults: Array.isArray(parsedChunk.data) ? parsedChunk.data : [parsedChunk.data]
+                          }
+                        : msg
+                    )
+                  );
+                }
+              } else if (parsedChunk.type === 'reasoning') {
                 accumulatedReasoning += parsedChunk.data;
                 setMessages(prev => 
                   prev.map(msg => 
@@ -324,6 +355,19 @@ export const ChatPage: React.FC = () => {
                       : msg
                   )
                 );
+              } else if (parsedChunk.type === 'error') {
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { 
+                          ...msg, 
+                          content: `Error: ${parsedChunk.data}`,
+                          isStreaming: false,
+                          isSearching: false
+                        }
+                      : msg
+                  )
+                );
               }
             }
           }
@@ -335,7 +379,12 @@ export const ChatPage: React.FC = () => {
       setMessages(prev => 
         prev.map(msg => 
           msg.id === aiMessageId 
-            ? { ...msg, isStreaming: false, isReasoningComplete: true }
+            ? { 
+                ...msg, 
+                isStreaming: false, 
+                isReasoningComplete: true,
+                isSearching: false
+              }
             : msg
         )
       );
@@ -374,7 +423,8 @@ export const ChatPage: React.FC = () => {
             ? { 
                 ...msg, 
                 content: "Sorry, I encountered an error while processing your request. Please try again.",
-                isStreaming: false
+                isStreaming: false,
+                isSearching: false
               }
             : msg
         )
@@ -484,6 +534,12 @@ export const ChatPage: React.FC = () => {
                 setUploadedFiles={setUploadedFiles}
                 isLoading={isLoading}
                 onFileAdded={handleFileAdded}
+              />
+              
+              <WebSearchToggle
+                enabled={webSearchEnabled}
+                onToggle={setWebSearchEnabled}
+                disabled={isLoading}
               />
               
               <div className="flex-1 min-w-0 relative">

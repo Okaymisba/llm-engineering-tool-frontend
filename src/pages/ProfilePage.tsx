@@ -8,13 +8,15 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
-import { Camera, Github, Mail, Trash2, Upload } from 'lucide-react';
+import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
+import { Camera, Github, Mail, Chrome } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export const ProfilePage: React.FC = () => {
   const { user } = useAuth();
   const { profile, loading, updateProfile, uploadAvatar } = useProfile();
+  const { accounts, loading: accountsLoading, connectGitHub } = useConnectedAccounts();
   const { toast } = useToast();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -98,6 +100,22 @@ export const ProfilePage: React.FC = () => {
     }
   };
 
+  const handleConnectGitHub = async () => {
+    try {
+      await connectGitHub();
+      toast({
+        title: "Connecting to GitHub",
+        description: "You will be redirected to GitHub to complete the connection.",
+      });
+    } catch (error) {
+      toast({
+        title: "Connection failed",
+        description: "Failed to connect to GitHub. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -108,6 +126,36 @@ export const ProfilePage: React.FC = () => {
       </div>
     );
   }
+
+  const getProviderIcon = (provider: string) => {
+    switch (provider) {
+      case 'email':
+        return <Mail className="h-5 w-5 text-muted-foreground" />;
+      case 'google':
+        return <Chrome className="h-5 w-5 text-blue-600" />;
+      case 'github':
+        return (
+          <div className="p-1 bg-black rounded">
+            <Github className="h-4 w-4 text-white" />
+          </div>
+        );
+      default:
+        return <Mail className="h-5 w-5 text-muted-foreground" />;
+    }
+  };
+
+  const getProviderName = (provider: string) => {
+    switch (provider) {
+      case 'email':
+        return 'Email';
+      case 'google':
+        return 'Google';
+      case 'github':
+        return 'GitHub';
+      default:
+        return provider;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -222,31 +270,41 @@ export const ProfilePage: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-border rounded-lg gap-3 sm:gap-0">
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium text-foreground">Email</p>
-                      <p className="text-sm text-muted-foreground break-all">{profile?.email}</p>
-                    </div>
+                {accountsLoading ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="mt-2 text-sm text-muted-foreground">Loading connected accounts...</p>
                   </div>
-                  <Badge variant="secondary">Primary</Badge>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-border rounded-lg gap-3 sm:gap-0">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1 bg-black rounded">
-                      <Github className="h-4 w-4 text-white" />
+                ) : (
+                  accounts.map((account) => (
+                    <div key={account.provider} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-border rounded-lg gap-3 sm:gap-0">
+                      <div className="flex items-center gap-3">
+                        {getProviderIcon(account.provider)}
+                        <div>
+                          <p className="font-medium text-foreground">{getProviderName(account.provider)}</p>
+                          <p className="text-sm text-muted-foreground break-all">
+                            {account.provider === 'email' ? account.email : 
+                             account.connected ? 'Connected' : 'Not connected'}
+                          </p>
+                        </div>
+                      </div>
+                      {account.provider === 'email' ? (
+                        <Badge variant="secondary">Primary</Badge>
+                      ) : account.connected ? (
+                        <Badge variant="default">Connected</Badge>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full sm:w-auto"
+                          onClick={account.provider === 'github' ? handleConnectGitHub : undefined}
+                        >
+                          Connect
+                        </Button>
+                      )}
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">GitHub</p>
-                      <p className="text-sm text-muted-foreground">Not connected</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm" className="w-full sm:w-auto">
-                    Connect
-                  </Button>
-                </div>
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>

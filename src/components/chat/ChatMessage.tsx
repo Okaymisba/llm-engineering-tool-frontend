@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -8,6 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, Copy } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { WebSearchResults } from './WebSearchResults';
 
 interface Message {
   id: string;
@@ -17,6 +17,8 @@ interface Message {
   isStreaming?: boolean;
   reasoning?: string;
   isReasoningComplete?: boolean;
+  webSearchResults?: any[];
+  isSearching?: boolean;
   metadata?: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -173,9 +175,15 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, username }) =
             </p>
           ) : (
             <div className="prose prose-sm max-w-none text-gray-800">
+              {/* Web Search Section - Using new component */}
+              <WebSearchResults 
+                isSearching={message.isSearching}
+                webSearchResults={message.webSearchResults}
+              />
+
               {/* Reasoning Section */}
               {message.reasoning !== undefined && (
-                <Collapsible className="mb-4">
+                <Collapsible defaultOpen={true} className="mb-4">
                   <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors">
                     <div className="flex items-center space-x-2">
                       <div className={`w-2 h-2 rounded-full ${message.isReasoningComplete ? 'bg-orange-500' : 'bg-orange-500 animate-pulse'}`}></div>

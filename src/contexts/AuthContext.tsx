@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +20,7 @@ interface AuthContextType {
   verifyOTP: (email: string, otp: string) => Promise<void>;
   requestOTP: (email: string, username: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInWithGitHub: () => Promise<void>;
   isLoading: boolean;
   isInitialized: boolean;
 }
@@ -40,12 +40,12 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [user, setUser] = React.useState<User | null>(null);
+  const [token, setToken] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [isInitialized, setIsInitialized] = React.useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
@@ -108,11 +108,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('Handling user session for:', supabaseUser.id);
       
       // Get or create user profile
-      let { data: profile, error } = supabase
+      const { data: profileData, error } = supabase
         .from('profiles')
         .select('id,username,first_name,last_name')
         .eq('id', supabaseUser.id)
         .single();
+
+      let profile = profileData;
 
       if (error && error.code === 'PGRST116') {
         // Profile doesn't exist, create it
@@ -266,6 +268,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const signInWithGitHub = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/`
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    } catch (error) {
+      console.error('GitHub sign in error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     setIsLoading(true);
     try {
@@ -306,6 +329,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     verifyOTP,
     requestOTP,
     signInWithGoogle,
+    signInWithGitHub,
     isLoading,
     isInitialized,
   };

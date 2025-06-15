@@ -4,9 +4,15 @@ import { Globe, ExternalLink } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown } from 'lucide-react';
 
+interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
 interface WebSearchResultsProps {
   isSearching?: boolean;
-  webSearchResults?: any[];
+  webSearchResults?: WebSearchResult[];
 }
 
 export const WebSearchResults: React.FC<WebSearchResultsProps> = ({
@@ -67,7 +73,7 @@ export const WebSearchResults: React.FC<WebSearchResultsProps> = ({
                         <div className="flex items-center space-x-2 mb-2">
                           <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500"></div>
                           <h4 className="text-sm font-semibold text-gray-900 group-hover:text-purple-700 transition-colors line-clamp-1">
-                            Source {index + 1}: {result.title || result.url || 'Web result'}
+                            {result.title || 'Web result'}
                           </h4>
                         </div>
                         {result.snippet && (

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Search } from 'lucide-react';
+import { Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -20,16 +20,17 @@ export const WebSearchToggle: React.FC<WebSearchToggleProps> = ({
       onClick={() => onToggle(!enabled)}
       disabled={disabled}
       variant={enabled ? "default" : "outline"}
-      size="icon"
+      size="sm"
       className={cn(
-        "h-8 w-8 shrink-0 transition-colors",
+        "h-8 shrink-0 transition-colors flex items-center gap-2",
         enabled 
           ? "bg-blue-600 hover:bg-blue-700 text-white" 
           : "border-gray-300 hover:bg-gray-100"
       )}
       title={enabled ? "Web search enabled" : "Web search disabled"}
     >
-      <Search className="h-4 w-4" />
+      <Globe className="h-4 w-4" />
+      <span className="hidden sm:inline">Search</span>
     </Button>
   );
 };

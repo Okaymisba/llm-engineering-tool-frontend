@@ -1,19 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Settings, LogOut, History, X, ArrowDown, User, UserCheck2Icon, Menu } from 'lucide-react';
+import { Send, Sparkles, ArrowDown, X, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { FileUpload } from '@/components/chat/FileUpload';
 import { fetchModels } from '@/components/chat/ModelSelector';
@@ -670,28 +662,6 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    toast({
-      title: "Logged out",
-      description: "You have been successfully logged out.",
-    });
-  };
-
-  const handleSettings = () => {
-    toast({
-      title: "Settings",
-      description: "Settings page coming soon!",
-    });
-  };
-
-  const handleChatHistory = () => {
-    toast({
-      title: "Chat History",
-      description: "Chat history feature coming soon!",
-    });
-  };
-
   return (
     <div className="min-h-screen w-full bg-gray-50 flex font-sans">
       {/* Sidebar */}
@@ -705,67 +675,35 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
 
       {/* Main Content */}
       <div className={`flex-1 flex flex-col transition-all duration-200 ${sidebarOpen ? 'md:ml-64' : ''}`}>
-        {/* Header with Sidebar Toggle */}
-        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="text-gray-600 hover:text-gray-900"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            {!isMobile && (
-              <h1 className="text-xl font-semibold text-gray-900">Syncmind</h1>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-gray-100 text-gray-600 text-sm font-medium">
-                      {user?.email?.charAt(0).toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <div className="flex items-center justify-start gap-2 p-2">
-                  <div className="flex flex-col space-y-1 leading-none">
-                    <p className="font-medium">{user?.email}</p>
-                  </div>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSettings}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleChatHistory}>
-                  <History className="mr-2 h-4 w-4" />
-                  <span>History</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
         {/* Chat Container */}
         <div className="flex-1 w-full max-w-4xl mx-auto px-4 flex flex-col relative">
-          {/* Messages Area */}
+          {/* Messages Area with custom scrollbar */}
           <div 
             ref={scrollContainerRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto py-6 space-y-4"
-            style={{ minHeight: 0 }}
+            className="flex-1 overflow-y-auto py-6 space-y-4 pr-2"
+            style={{ 
+              minHeight: 0,
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#cbd5e1 transparent'
+            }}
           >
+            <style jsx>{`
+              div::-webkit-scrollbar {
+                width: 6px;
+              }
+              div::-webkit-scrollbar-track {
+                background: transparent;
+              }
+              div::-webkit-scrollbar-thumb {
+                background-color: #cbd5e1;
+                border-radius: 3px;
+              }
+              div::-webkit-scrollbar-thumb:hover {
+                background-color: #94a3b8;
+              }
+            `}</style>
+            
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full min-h-[400px]">
                 <div className="text-center max-w-md">

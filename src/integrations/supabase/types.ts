@@ -57,7 +57,6 @@ export type Database = {
       chats: {
         Row: {
           answer: string | null
-          belongs_to: string
           created_at: string | null
           document: string | null
           id: string
@@ -67,13 +66,12 @@ export type Database = {
           model: string
           output_tokens: number
           question: string
-          session_id: string | null
+          session_id: string
           status: number
           total_tokens: number
         }
         Insert: {
           answer?: string | null
-          belongs_to: string
           created_at?: string | null
           document?: string | null
           id?: string
@@ -83,13 +81,12 @@ export type Database = {
           model: string
           output_tokens: number
           question: string
-          session_id?: string | null
+          session_id: string
           status: number
           total_tokens: number
         }
         Update: {
           answer?: string | null
-          belongs_to?: string
           created_at?: string | null
           document?: string | null
           id?: string
@@ -99,18 +96,11 @@ export type Database = {
           model?: string
           output_tokens?: number
           question?: string
-          session_id?: string | null
+          session_id?: string
           status?: number
           total_tokens?: number
         }
         Relationships: [
-          {
-            foreignKeyName: "chats_belongs_to_fkey"
-            columns: ["belongs_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "chats_session_id_fkey"
             columns: ["session_id"]
@@ -289,6 +279,7 @@ export type Database = {
       sessions: {
         Row: {
           avg_latency_ms: number | null
+          chat_title: string
           created_at: string | null
           id: string
           last_used_at: string | null
@@ -298,6 +289,7 @@ export type Database = {
         }
         Insert: {
           avg_latency_ms?: number | null
+          chat_title?: string
           created_at?: string | null
           id?: string
           last_used_at?: string | null
@@ -307,6 +299,7 @@ export type Database = {
         }
         Update: {
           avg_latency_ms?: number | null
+          chat_title?: string
           created_at?: string | null
           id?: string
           last_used_at?: string | null

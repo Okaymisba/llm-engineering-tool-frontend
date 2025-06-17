@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Settings, LogOut, History, X, ArrowDown, User, UserCheck2Icon } from 'lucide-react';
+import { Send, Sparkles, Settings, LogOut, History, X, ArrowDown, User, UserCheck2Icon, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +18,9 @@ import { FileUpload } from '@/components/chat/FileUpload';
 import { fetchModels } from '@/components/chat/ModelSelector';
 import { Model } from '@/types/model';
 import { WebSearchToggle } from '@/components/chat/WebSearchToggle';
+import { ChatSidebar } from '@/components/chat/ChatSidebar';
+import { useChatSessions } from '@/hooks/useChatSessions';
+import { useChatMessages } from '@/hooks/useChatMessages';
 
 interface Message {
   id: string;
@@ -106,11 +109,12 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
-  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isUserScrolled, setIsUserScrolled] = useState(false);
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const { user, token, session, logout, refreshSession, isTokenValid } = useAuth();
   const { toast } = useToast();
@@ -119,6 +123,9 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const { createNewSession, updateSessionTitle, updateSessionLastUsed } = useChatSessions();
+  const { messages: dbMessages, saveMessage } = useChatMessages(currentSessionId);
 
   // Load models when component mounts
   useEffect(() => {
@@ -278,6 +285,43 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
     setUploadedFiles(prev => [...prev, ...newFiles]);
   };
 
+  const handleNewChat = async () => {
+    const newSessionId = await createNewSession();
+    if (newSessionId) {
+      setCurrentSessionId(newSessionId);
+      setMessages([]);
+      setInputValue('');
+      setUploadedFiles([]);
+    }
+  };
+
+  const handleSelectSession = (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    // Convert database messages to UI format
+    const convertedMessages: Message[] = dbMessages.map((dbMsg, index) => [
+      {
+        id: `${dbMsg.id}-user`,
+        content: dbMsg.question,
+        role: 'user' as const,
+        timestamp: new Date(dbMsg.created_at),
+      },
+      {
+        id: `${dbMsg.id}-assistant`,
+        content: dbMsg.answer || '',
+        role: 'assistant' as const,
+        timestamp: new Date(dbMsg.created_at),
+        metadata: {
+          prompt_tokens: dbMsg.input_tokens,
+          completion_tokens: dbMsg.output_tokens,
+          total_tokens: dbMsg.total_tokens,
+        },
+      }
+    ]).flat();
+    
+    setMessages(convertedMessages);
+    updateSessionLastUsed(sessionId);
+  };
+
   const handleSendMessage = async () => {
     if ((!inputValue.trim() && uploadedFiles.length === 0) || isLoading) return;
 
@@ -290,6 +334,21 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
         variant: "destructive",
       });
       return;
+    }
+
+    // Create session if none exists
+    let sessionToUse = currentSessionId;
+    if (!sessionToUse) {
+      sessionToUse = await createNewSession();
+      if (!sessionToUse) {
+        toast({
+          title: "Error",
+          description: "Failed to create chat session. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setCurrentSessionId(sessionToUse);
     }
 
     // Debug: Log model selection
@@ -341,10 +400,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
 
     try {
       const formData = new FormData();
-      formData.append('session_id', sessionId);
+      formData.append('session_id', sessionToUse);
       formData.append('question', currentInput);
       formData.append('provider', selectedModelData.provider);
-      formData.append('model', selectedModelData.model_id); // Use model_id instead of UUID
+      formData.append('model', selectedModelData.model_id);
       formData.append('web_search', webSearchEnabled.toString());
       formData.append('our_image_processing_algo', 'false');
       formData.append('document_semantic_search', 'false');
@@ -480,7 +539,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
                             msg.id === aiMessageId 
                               ? { ...msg, isReasoningComplete: true }
                               : msg
-                          )
+                            )
                         );
                       }
                       accumulatedContent += parsedChunk.data;
@@ -536,6 +595,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
       let accumulatedReasoning = '';
       let isReasoningPhase = isReasoningModel;
       let buffer = '';
+      let serverSessionId = sessionToUse;
 
       if (reader) {
         try {
@@ -552,6 +612,14 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
             
             for (const parsedChunk of parsed) {
               console.log('Received chunk:', parsedChunk);
+              
+              // Handle session_id from server
+              if (parsedChunk.type === 'session_id') {
+                serverSessionId = parsedChunk.data;
+                console.log('Received session_id from server:', serverSessionId);
+                setCurrentSessionId(serverSessionId);
+                continue;
+              }
               
               if (parsedChunk.type === 'web_search') {
                 console.log('Web search chunk data:', parsedChunk.data);
@@ -650,6 +718,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
         }
       }
 
+      // Mark message as complete
       setMessages(prev => 
         prev.map(msg => 
           msg.id === aiMessageId 
@@ -662,6 +731,27 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
             : msg
         )
       );
+
+      // Save to database
+      const finalMessage = messages.find(m => m.id === aiMessageId);
+      if (finalMessage && finalMessage.metadata) {
+        await saveMessage(
+          serverSessionId,
+          currentInput,
+          accumulatedContent,
+          selectedModelData.model_id,
+          finalMessage.metadata.prompt_tokens,
+          finalMessage.metadata.completion_tokens,
+          currentFiles.find(f => f.type === 'image')?.file.name,
+          currentFiles.find(f => f.type === 'document')?.file.name
+        );
+
+        // Update session title if it's the first message
+        if (messages.filter(m => m.role === 'user').length === 1) {
+          const title = currentInput.slice(0, 50) + (currentInput.length > 50 ? '...' : '');
+          await updateSessionTitle(serverSessionId, title);
+        }
+      }
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -740,114 +830,176 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
   };
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 flex flex-col font-sans">
-      {/* Chat Container */}
-      <div className="flex-1 w-full max-w-4xl mx-auto px-4 flex flex-col relative">
-        {/* Messages Area */}
-        <div 
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto py-6 space-y-4"
-          style={{ minHeight: 0 }}
-        >
-          {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full min-h-[400px]">
-              <div className="text-center max-w-md">
-                <Sparkles className="h-12 w-12 text-green-600 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">How can I help you today?</h3>
-                <p className="text-gray-600">
-                  Start a conversation with {availableModels.find(m => m.id === selectedModel)?.name || 'AI'}.
-                </p>
-              </div>
-            </div>
-          ) : (
-            messages.map((message) => (
-              <ChatMessage 
-                key={message.id} 
-                message={message} 
-                username={user?.username} 
-              />
-            ))
-          )}
-          <div ref={messagesEndRef} />
+    <div className="min-h-screen w-full bg-gray-50 flex font-sans">
+      {/* Sidebar */}
+      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'w-0' : 'w-80'} ${isMobile ? 'absolute z-10 h-full' : ''}`}>
+        {!sidebarCollapsed && (
+          <ChatSidebar
+            currentSessionId={currentSessionId}
+            onNewChat={handleNewChat}
+            onSelectSession={handleSelectSession}
+            className="h-full"
+          />
+        )}
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col relative">
+        {/* Header with sidebar toggle */}
+        <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="text-gray-600 hover:text-gray-900"
+          >
+            <PanelLeft className="h-5 w-5" />
+          </Button>
+          
+          <div className="flex items-center gap-3">
+            {/* User menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm font-medium">
+                      {user?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <div className="flex flex-col space-y-1 p-2">
+                  <p className="text-sm font-medium leading-none">{user?.username || 'User'}</p>
+                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSettings}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleChatHistory}>
+                  <History className="mr-2 h-4 w-4" />
+                  <span>Chat History</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
-        {/* Scroll to Bottom Button */}
-        {showScrollToBottom && (
-          <Button
-            onClick={() => scrollToBottom()}
-            className="fixed bottom-24 right-8 h-10 w-10 rounded-full bg-white border shadow-lg hover:shadow-xl z-10"
-            size="icon"
-            variant="outline"
+        {/* Chat Container */}
+        <div className="flex-1 w-full max-w-4xl mx-auto px-4 flex flex-col relative">
+          {/* Messages Area */}
+          <div 
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto py-6 space-y-4"
+            style={{ minHeight: 0 }}
           >
-            <ArrowDown className="h-4 w-4" />
-          </Button>
-        )}
-
-        {/* Cancel Button during streaming */}
-        {isLoading && (
-          <div className="flex justify-center py-4">
-            <Button
-              onClick={handleCancelRequest}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
-            >
-              <X className="h-4 w-4" />
-              Stop generating
-            </Button>
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full min-h-[400px]">
+                <div className="text-center max-w-md">
+                  <Sparkles className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">How can I help you today?</h3>
+                  <p className="text-gray-600">
+                    Start a conversation with {availableModels.find(m => m.id === selectedModel)?.name || 'AI'}.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <ChatMessage 
+                  key={message.id} 
+                  message={message} 
+                  username={user?.username} 
+                />
+              ))
+            )}
+            <div ref={messagesEndRef} />
           </div>
-        )}
 
-        {/* Input Area */}
-        <div className="py-4 sticky bottom-0 bg-gray-50">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200 p-4">
-            <div className="flex items-end gap-3">
-              <div className="flex items-center gap-2">
-                <FileUpload 
-                  uploadedFiles={uploadedFiles}
-                  setUploadedFiles={setUploadedFiles}
-                  isLoading={isLoading}
-                  onFileAdded={handleFileAdded}
-                />
-                
-                <WebSearchToggle
-                  enabled={webSearchEnabled}
-                  onToggle={setWebSearchEnabled}
-                  disabled={isLoading}
-                />
-              </div>
-              
-              <div className="flex-1 min-w-0 relative">
-                <Textarea
-                  ref={inputRef}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  placeholder="Message Syncmind..."
-                  className="min-h-[40px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base bg-transparent"
-                  disabled={isLoading}
-                  rows={1}
-                  style={{ 
-                    height: 'auto',
-                    lineHeight: '1.5'
-                  }}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
-                  }}
-                />
-              </div>
-              
+          {/* Scroll to Bottom Button */}
+          {showScrollToBottom && (
+            <Button
+              onClick={() => scrollToBottom()}
+              className="fixed bottom-24 right-8 h-10 w-10 rounded-full bg-white border shadow-lg hover:shadow-xl z-10"
+              size="icon"
+              variant="outline"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </Button>
+          )}
+
+          {/* Cancel Button during streaming */}
+          {isLoading && (
+            <div className="flex justify-center py-4">
               <Button
-                onClick={handleSendMessage}
-                disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading}
-                size="icon"
-                className="h-10 w-10 bg-blue-600 hover:bg-blue-700 rounded-xl shrink-0 shadow-md hover:shadow-lg transition-all duration-200"
+                onClick={handleCancelRequest}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
               >
-                <Send className="h-4 w-4" />
+                <X className="h-4 w-4" />
+                Stop generating
               </Button>
+            </div>
+          )}
+
+          {/* Input Area */}
+          <div className="py-4 sticky bottom-0 bg-gray-50">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200 p-4">
+              <div className="flex items-end gap-3">
+                <div className="flex items-center gap-2">
+                  <FileUpload 
+                    uploadedFiles={uploadedFiles}
+                    setUploadedFiles={setUploadedFiles}
+                    isLoading={isLoading}
+                    onFileAdded={handleFileAdded}
+                  />
+                  
+                  <WebSearchToggle
+                    enabled={webSearchEnabled}
+                    onToggle={setWebSearchEnabled}
+                    disabled={isLoading}
+                  />
+                </div>
+                
+                <div className="flex-1 min-w-0 relative">
+                  <Textarea
+                    ref={inputRef}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    placeholder="Message Syncmind..."
+                    className="min-h-[40px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base bg-transparent"
+                    disabled={isLoading}
+                    rows={1}
+                    style={{ 
+                      height: 'auto',
+                      lineHeight: '1.5'
+                    }}
+                    onInput={(e) => {
+                      const target = e.target as HTMLTextAreaElement;
+                      target.style.height = 'auto';
+                      target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+                    }}
+                  />
+                </div>
+                
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading}
+                  size="icon"
+                  className="h-10 w-10 bg-blue-600 hover:bg-blue-700 rounded-xl shrink-0 shadow-md hover:shadow-lg transition-all duration-200"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>

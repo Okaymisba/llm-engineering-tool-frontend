@@ -170,7 +170,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setToken(userSession.access_token);
       
       // Get or create user profile
-      const { data: profileData, error } = await supabase
+      const { data: profileData, error } = supabase
         .from('profiles')
         .select('id,username,first_name,last_name')
         .eq('id', supabaseUser.id)

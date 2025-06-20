@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Settings, LogOut, History, X, ArrowDown, User, UserCheck2Icon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -113,7 +112,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
 
-  const { user, token, logout } = useAuth();
+  const { user, token, session, logout, refreshSession, isTokenValid } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -151,6 +150,54 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
 
     loadModels();
   }, [selectedModel, onModelChange, toast]);
+
+  // Add session monitoring
+  useEffect(() => {
+    if (!session) return;
+
+    const checkTokenExpiry = () => {
+      if (!isTokenValid()) {
+        console.log('Token is about to expire, attempting refresh...');
+        refreshSession().then((success) => {
+          if (!success) {
+            console.log('Session refresh failed, user may need to log in again');
+            toast({
+              title: "Session Expired",
+              description: "Please log in again to continue.",
+              variant: "destructive",
+            });
+          }
+        });
+      }
+    };
+
+    // Check token validity every 5 minutes
+    const tokenCheckInterval = setInterval(checkTokenExpiry, 5 * 60 * 1000);
+
+    return () => {
+      clearInterval(tokenCheckInterval);
+    };
+  }, [session, isTokenValid, refreshSession, toast]);
+
+  // Validate token before making API calls
+  const validateAndRefreshToken = async (): Promise<string | null> => {
+    if (!session || !token) {
+      return null;
+    }
+
+    if (isTokenValid()) {
+      return token;
+    }
+
+    console.log('Token expired, attempting refresh...');
+    const refreshSuccess = await refreshSession();
+    
+    if (refreshSuccess && session) {
+      return session.access_token;
+    }
+
+    return null;
+  };
 
   const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -234,10 +281,12 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
   const handleSendMessage = async () => {
     if ((!inputValue.trim() && uploadedFiles.length === 0) || isLoading) return;
 
-    if (!token) {
+    // Validate token before proceeding
+    const validToken = await validateAndRefreshToken();
+    if (!validToken) {
       toast({
         title: "Authentication Error",
-        description: "Please log in to send messages.",
+        description: "Your session has expired. Please log in again.",
         variant: "destructive",
       });
       return;
@@ -304,7 +353,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
       console.log('Sending to backend:', {
         provider: selectedModelData.provider,
         model: selectedModelData.model_id,
-        web_search: webSearchEnabled.toString()
+        web_search: webSearchEnabled.toString(),
+        tokenValid: isTokenValid()
       });
 
       currentFiles.forEach((uploadedFile) => {
@@ -321,13 +371,162 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${validToken}`,
+          'x-refresh-token': session?.refresh_token || '',
         },
         body: formData,
         signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
+        // Handle authentication errors specifically
+        if (response.status === 401 || response.status === 403) {
+          console.log('Authentication error, attempting token refresh...');
+          const refreshedToken = await validateAndRefreshToken();
+          
+          if (refreshedToken) {
+            // Retry the request with refreshed token
+            const retryResponse = await fetch(`${API_BASE_URL}/chat`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${refreshedToken}`,
+              },
+              body: formData,
+              signal: abortControllerRef.current.signal,
+            });
+            
+            if (!retryResponse.ok) {
+              const errorText = await retryResponse.text();
+              throw new Error(`HTTP error! status: ${retryResponse.status}, message: ${errorText}`);
+            }
+            
+            // Continue with the retry response
+            const reader = retryResponse.body?.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedContent = '';
+            let accumulatedReasoning = '';
+            let isReasoningPhase = isReasoningModel;
+            let buffer = '';
+
+            if (reader) {
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  
+                  if (done) break;
+                  
+                  const chunk = decoder.decode(value, { stream: true });
+                  buffer += chunk;
+                  
+                  const { parsed, remaining } = parseJSONStream(buffer);
+                  buffer = remaining;
+                  
+                  for (const parsedChunk of parsed) {
+                    console.log('Received chunk:', parsedChunk);
+                    
+                    if (parsedChunk.type === 'web_search') {
+                      console.log('Web search chunk data:', parsedChunk.data);
+                      
+                      if (typeof parsedChunk.data === 'string') {
+                        // Still searching
+                        setMessages(prev => 
+                          prev.map(msg => 
+                            msg.id === aiMessageId 
+                              ? { ...msg, isSearching: true }
+                              : msg
+                          )
+                        );
+                      } else {
+                        // Search results received - extract from nested array structure
+                        let searchResults = [];
+                        
+                        if (Array.isArray(parsedChunk.data) && parsedChunk.data.length > 0) {
+                          // Handle nested array structure: data: [[{results}]]
+                          if (Array.isArray(parsedChunk.data[0])) {
+                            searchResults = parsedChunk.data[0];
+                          } else {
+                            // Handle flat array structure: data: [{results}]
+                            searchResults = parsedChunk.data;
+                          }
+                        }
+                        
+                        console.log('Processed search results:', searchResults);
+                        
+                        setMessages(prev => 
+                          prev.map(msg => 
+                            msg.id === aiMessageId 
+                              ? { 
+                                  ...msg, 
+                                  isSearching: false, 
+                                  webSearchResults: searchResults
+                                }
+                              : msg
+                          )
+                        );
+                      }
+                    } else if (parsedChunk.type === 'reasoning') {
+                      accumulatedReasoning += parsedChunk.data;
+                      setMessages(prev => 
+                        prev.map(msg => 
+                          msg.id === aiMessageId 
+                            ? { ...msg, reasoning: accumulatedReasoning }
+                            : msg
+                        )
+                      );
+                    } else if (parsedChunk.type === 'content') {
+                      if (isReasoningPhase) {
+                        isReasoningPhase = false;
+                        setMessages(prev => 
+                          prev.map(msg => 
+                            msg.id === aiMessageId 
+                              ? { ...msg, isReasoningComplete: true }
+                              : msg
+                          )
+                        );
+                      }
+                      accumulatedContent += parsedChunk.data;
+                      setMessages(prev => 
+                        prev.map(msg => 
+                          msg.id === aiMessageId 
+                            ? { ...msg, content: accumulatedContent }
+                            : msg
+                        )
+                      );
+                    } else if (parsedChunk.type === 'metadata') {
+                      setMessages(prev => 
+                        prev.map(msg => 
+                          msg.id === aiMessageId 
+                            ? { ...msg, metadata: parsedChunk.data }
+                            : msg
+                        )
+                      );
+                    } else if (parsedChunk.type === 'error') {
+                      setMessages(prev => 
+                        prev.map(msg => 
+                          msg.id === aiMessageId 
+                            ? { 
+                                ...msg, 
+                                content: `Error: ${parsedChunk.data}`,
+                                isStreaming: false,
+                                isSearching: false
+                              }
+                            : msg
+                        )
+                      );
+                    }
+                  }
+                }
+              } finally {
+                reader.releaseLock();
+              }
+            }
+
+            return;
+          } else {
+            throw new Error('Authentication failed. Please log in again.');
+          }
+        }
+        
         const errorText = await response.text();
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
@@ -476,10 +675,11 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
       if (error instanceof Error) {
         if (error.message.includes('Failed to fetch')) {
           errorMessage = "Unable to connect to server. Please check your connection.";
-        } else if (error.message.includes('401')) {
+        } else if (error.message.includes('Authentication failed')) {
+          errorMessage = "Your session has expired. Please log in again.";
+          // Optionally redirect to login or trigger re-authentication
+        } else if (error.message.includes('401') || error.message.includes('403')) {
           errorMessage = "Authentication failed. Please log in again.";
-        } else if (error.message.includes('403')) {
-          errorMessage = "Access denied. Please check your permissions.";
         } else if (error.message.includes('404')) {
           errorMessage = "Chat endpoint not found. Please check server configuration.";
         } else if (error.message.includes('500')) {

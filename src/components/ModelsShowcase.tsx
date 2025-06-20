@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, Zap, AlertCircle } from 'lucide-react';
 import { useCachedModels } from '@/hooks/useCachedModels';
+import { formatTokens } from '@/utils/formatTokens';
 
 interface Model {
   id: string;
@@ -177,7 +178,7 @@ export const ModelsShowcase: React.FC = () => {
                     <div className="text-right">
                       <div className="flex items-center text-2xl font-bold text-gray-900 mb-1">
                         <Zap className="w-5 h-5 mr-1 text-yellow-500" />
-                        {(model.total_tokens_this_month || 0).toLocaleString()}
+                        {formatTokens(model.total_tokens_this_month || 0)}
                       </div>
                       <p className="text-sm text-gray-600">tokens used</p>
                     </div>

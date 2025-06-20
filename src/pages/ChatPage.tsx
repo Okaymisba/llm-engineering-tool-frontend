@@ -372,6 +372,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ selectedModel, onModelChange
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${validToken}`,
+          'x-refresh-token': session?.refresh_token || '',
         },
         body: formData,
         signal: abortControllerRef.current.signal,
